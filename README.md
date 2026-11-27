@@ -19,7 +19,7 @@ DeskPill is a small desktop notch that expands when you need it. Control your mu
 - **English dictation:** optional offline speech to text with hold-to-talk Win+Space, a microphone-reactive waveform inside the notch, cancellation and guarded paste. No separate app is required.
 - **Personalization:** Classic, Glass, seven colored skins, live theme preview, and your own six-color Custom palette with matte/satin finish and outline strength.
 
-Hover intent defaults to 110 ms before opening and 130 ms before revealing options, helping brief pointer passes stay quiet. Click actions respond immediately. **Settings → Motion** lets you tune those delays, closing grace and animation pace with live preview and reset.
+Hover intent defaults to 110 ms before opening and 130 ms before revealing options, helping brief pointer passes stay quiet. Click actions respond immediately. Buttons show a focus outline for keyboard navigation without retaining it after mouse clicks. **Settings → Motion** lets you tune those delays, closing grace and animation pace with live preview and reset.
 
 The notch yields to occupied title-bar space, supports fullscreen hiding, and respects Windows reduced-motion settings. Startup is opt-in.
 

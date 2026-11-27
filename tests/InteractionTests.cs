@@ -185,6 +185,11 @@ class InteractionTests {
    var w=Island();var service=(MediaService)Field(w,"media");service.Current=new MediaSnapshot {Source="chrome.exe",Title="An example song",Artist="An artist"};Call(w,"RebuildCurrentPage",true);
    Check(Controls<Button>(w).Any(b=>Convert.ToString(b.ToolTip)=="Open playing app or browser tab"),"Track source has no keyboard-accessible action");Call(w,"Cleanup");
   });
+  Test("Page arrows do not retain a border after click navigation and keep keyboard feedback",delegate {
+   var w=Island();w.GetType().GetProperty("RuntimeProbeMode",Private).SetValue(w,true,null);
+   try{w.Show();w.Activate();foreach(string field in new[]{"nextBtn","prevBtn"}){var button=(Button)Field(w,field);string before=Convert.ToString(Field(w,"page"));button.Focus();button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));w.UpdateLayout();Check(Convert.ToString(Field(w,"page"))!=before,"Arrow did not navigate");Check(button.IsKeyboardFocused,"Arrow focus fixture failed");var shell=(Border)button.Template.FindName("shell",button);var brush=shell.BorderBrush as SolidColorBrush;Check(brush!=null&&brush.Color.A==0,"Click left a persistent arrow border after page change");Check(button.FocusVisualStyle!=null,"Arrow lost keyboard-only focus feedback");}}
+   finally{Call(w,"Cleanup");w.Hide();}
+  });
   Test("Focusing the music source never leaves a persistent template border",delegate {
    var w=Island();w.GetType().GetProperty("RuntimeProbeMode",Private).SetValue(w,true,null);
    try {
