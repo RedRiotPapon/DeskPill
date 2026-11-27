@@ -1,0 +1,21 @@
+# Build output and local app data
+bin/
+obj/
+dist/
+artifacts/
+state.json
+state.json.*
+*.user
+.vs/
+.vscode/
+.env
+.env.*
+*.pfx
+*.p12
+# Local design experiments and research
+.impeccable/
+Impeccable/
+.superpowers/
+docs/research/
+docs/motion-frames/
+docs/screenshots/
