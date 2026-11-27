@@ -73,12 +73,21 @@ namespace DeskPill
                     !AgentVisionNative.IsWindowVisible(WindowHandle) || AgentVisionNative.IsIconic(WindowHandle)) return false;
                 var title = new StringBuilder(1024);
                 AgentVisionNative.GetWindowText(WindowHandle, title, title.Capacity);
-                if (title.ToString() != Title) return false;
+                string liveTitle = title.ToString();
                 AgentVisionNative.Rect rect;
                 if (!AgentVisionNative.GetWindowRect(WindowHandle, out rect)) return false;
                 bounds = rect.ToRectangle();
-                if (!IsUsableIdentity(WindowHandle, ProcessId, Title, bounds) || bounds != WindowBounds) return false;
-                try { using (var p = Process.GetProcessById(ProcessId)) return p.StartTime.ToUniversalTime().Ticks == started; }
+                if (!IsUsableIdentity(WindowHandle, ProcessId, liveTitle, bounds)) return false;
+                try
+                {
+                    using (var p = Process.GetProcessById(ProcessId))
+                    {
+                        if (p.StartTime.ToUniversalTime().Ticks != started) return false;
+                    }
+                    Title = liveTitle;
+                    WindowBounds = bounds;
+                    return true;
+                }
                 catch (Exception) { return false; }
             }
         }
@@ -157,15 +166,36 @@ namespace DeskPill
             {
                 Rectangle ignored;
                 if (target == null || !target.TryValidate(out ignored)) throw new InvalidOperationException("Select an external window on the monitor first.");
-                using (new AgentPhysicalCoordinates())
-                {
-                    var monitor = new AgentVisionNative.MonitorInfo();
-                    monitor.Size = Marshal.SizeOf(typeof(AgentVisionNative.MonitorInfo));
-                    if (!AgentVisionNative.GetMonitorInfo(AgentVisionNative.MonitorFromWindow(target.WindowHandle, 2), ref monitor) || monitor.Monitor.ToRectangle() != target.MonitorBounds)
-                        throw new InvalidOperationException("The monitor arrangement changed. Select the window again.");
-                    return Capture(target.MonitorBounds, "Monitor · visible desktop pixels " + target.MonitorBounds.Width + " × " + target.MonitorBounds.Height);
-                }
+                return CaptureMonitorFromHandle(target.WindowHandle, true);
             });
+        }
+        public static Task<AgentAttachment> CaptureMonitorByHandleAsync(IntPtr referenceWindow)
+        {
+            return Task.Run(delegate
+            {
+                return CaptureMonitorFromHandle(referenceWindow, false);
+            });
+        }
+        static AgentAttachment CaptureMonitorFromHandle(IntPtr referenceWindow, bool requireWindowMatch)
+        {
+            using (new AgentPhysicalCoordinates())
+            {
+                IntPtr monitorHandle;
+                if (referenceWindow != IntPtr.Zero)
+                    monitorHandle = AgentVisionNative.MonitorFromWindow(referenceWindow, 2);
+                else
+                {
+                    AgentVisionNative.NativePoint cursor;
+                    AgentVisionNative.GetCursorPos(out cursor);
+                    monitorHandle = AgentVisionNative.MonitorFromPoint(cursor, 2);
+                }
+                var monitor = new AgentVisionNative.MonitorInfo();
+                monitor.Size = Marshal.SizeOf(typeof(AgentVisionNative.MonitorInfo));
+                if (!AgentVisionNative.GetMonitorInfo(monitorHandle, ref monitor))
+                    throw new InvalidOperationException(requireWindowMatch ? "The monitor arrangement changed. Select the window again." : "Current monitor is unavailable.");
+                Rectangle monBounds = monitor.Monitor.ToRectangle();
+                return Capture(monBounds, "Monitor · visible desktop pixels " + monBounds.Width + " × " + monBounds.Height);
+            }
         }
         public static async Task<AgentAttachment> CaptureAreaAsync(Window owner)
         {
@@ -208,10 +238,31 @@ namespace DeskPill
         }
         internal static bool IsBlack(Bitmap bitmap)
         {
-            for (int y = 0; y < bitmap.Height; y += Math.Max(1, bitmap.Height / 40))
-                for (int x = 0; x < bitmap.Width; x += Math.Max(1, bitmap.Width / 40))
-                { System.Drawing.Color c = bitmap.GetPixel(x, y); if (c.R > 3 || c.G > 3 || c.B > 3) return false; }
-            return true;
+            var rect = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
+            BitmapData data = bitmap.LockBits(rect, ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppRgb);
+            try
+            {
+                int absStride = Math.Abs(data.Stride);
+                byte[] row = new byte[absStride];
+                int stepY = Math.Max(1, Math.Min(4, bitmap.Height / 40));
+                int stepX = Math.Max(1, Math.Min(4, bitmap.Width / 40));
+                for (int y = 0; y < bitmap.Height; y += stepY)
+                {
+                    IntPtr rowPtr = new IntPtr(data.Scan0.ToInt64() + (long)y * data.Stride);
+                    Marshal.Copy(rowPtr, row, 0, absStride);
+                    for (int x = 0; x < bitmap.Width; x += stepX)
+                    {
+                        int offset = x * 4;
+                        if (row[offset] > 3 || row[offset + 1] > 3 || row[offset + 2] > 3)
+                            return false;
+                    }
+                }
+                return true;
+            }
+            finally
+            {
+                bitmap.UnlockBits(data);
+            }
         }
         internal static AgentAttachment Save(Bitmap bitmap, string source)
         {
@@ -254,6 +305,7 @@ namespace DeskPill
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern int GetWindowText(IntPtr window, StringBuilder title, int count);
         [DllImport("user32.dll")] internal static extern bool GetWindowRect(IntPtr window, out Rect rect);
         [DllImport("user32.dll")] internal static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
+        [DllImport("user32.dll")] internal static extern IntPtr MonitorFromPoint(NativePoint point, uint flags);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
         [DllImport("user32.dll")] internal static extern bool GetWindowDisplayAffinity(IntPtr window, out uint affinity);
         [DllImport("user32.dll")] internal static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);

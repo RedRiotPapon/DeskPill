@@ -93,7 +93,8 @@ namespace DeskPill
             var detail=state.Agents.FirstOrDefault(a=>a.Id==agentDetailId);
             if(detail==null||pose!=NotchPose.InlineAgents||agentResult==null)return;
             var active=Agents.Get(detail.Id);
-            if(agentSpeech==null)agentDetailStatus.Text="Experimental · "+(AgentTools.IsShortcut(detail)?"Manual handoff":active.Status)+" · "+(detail.AllowEdits?"Project edits allowed":"Review only")+" · "+ProjectName(detail.Workspace);
+            if(!string.IsNullOrEmpty(agentCaptureNote)){agentDetailStatus.Text=agentCaptureNote;agentDetailStatus.Foreground=Ui.Hex("#FF375F");}
+            else{agentDetailStatus.Foreground=Ui.Muted;if(agentSpeech==null)agentDetailStatus.Text="Experimental · "+(AgentTools.IsShortcut(detail)?"Manual handoff":active.Status)+" · "+(detail.AllowEdits?"Project edits allowed":"Review only")+" · "+ProjectName(detail.Workspace);}
             string output=active.Status=="Needs attention"?active.Summary+Environment.NewLine+active.Transcript:string.IsNullOrEmpty(active.Transcript)?(AgentTools.IsShortcut(detail)?"Write a prompt below. Copy it, then open your app to choose its destination.":"Ask about this project. For screen questions, use the camera to attach and review an image before Send. Screen access is not automatic."):active.Transcript;
             if(active.Diagnostics.Length==0)agentDiagnosticsShown=false;
             agentDetails.Visibility=active.Diagnostics.Length>0?Visibility.Visible:Visibility.Hidden;
@@ -129,6 +130,8 @@ namespace DeskPill
         void ShowAgentConversation(string id)
         {
             var profile=state.Agents.FirstOrDefault(a=>a.Id==id);if(profile==null)return;
+            if(!this.open)TrackAgentContext();
+            agentCaptureNote="";
             PreserveAgentDraft();CloseAgentPreview();agentUnread.Remove(id);CloseVolumeMenu();
             if(dictation!=null&&dictation.Active)dictation.Cancel();
             agentDiagnosticsShown=false;agentDetailId=id;state.SelectedAgent=id;Save();
@@ -150,7 +153,7 @@ namespace DeskPill
             agentDetailStatus=Ui.Text("",10,Ui.Muted);agentDetailStatus.TextTrimming=TextTrimming.CharacterEllipsis;footer.Children.Add(agentDetailStatus);
             Grid.SetRow(footer,4);body.Children.Add(footer);
             var promptInput=agentPrompt;var destinationPicker=agentPicker;
-            agentPrompt.TextChanged+=delegate{if(agentHub!=null)Agents.Get(id).Draft=promptInput.Text;RefreshAgentViews();};
+            agentPrompt.TextChanged+=delegate{agentCaptureNote="";if(agentHub!=null)Agents.Get(id).Draft=promptInput.Text;RefreshAgentViews();};
             agentPrompt.PreviewKeyDown+=delegate(object sender,KeyEventArgs e){if(e.Key==Key.Enter&&(Keyboard.Modifiers&ModifierKeys.Control)!=0){SendAgentPrompt();e.Handled=true;}};
             agentPicker.SelectionChanged+=delegate{var next=destinationPicker.SelectedItem as AgentProfile;if(next!=null&&next.Id!=agentDetailId)ShowAgentConversation(next.Id);};
             // ShowInlineView may open the shell, whose closing cleanup clears the inline host.
@@ -163,6 +166,7 @@ namespace DeskPill
             var profile=state.Agents.FirstOrDefault(a=>a.Id==agentDetailId);
             if(profile==null||agentPrompt==null||agentSpeech!=null||agentCapturing)return;
             string prompt=agentPrompt.Text.Trim();if(prompt.Length==0||Agents.Get(profile.Id).Running)return;
+            agentCaptureNote="";
             if(AgentTools.IsShortcut(profile))
             {
                 try{Clipboard.SetText(prompt);agentDetailStatus.Text="Copied · open your app to choose the session";}catch{agentDetailStatus.Text="Clipboard busy · try again";}return;

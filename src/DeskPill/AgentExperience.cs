@@ -23,7 +23,7 @@ namespace DeskPill
         Border agentAttachmentChip;
         Button agentCaptureButton;
         Window agentAttachmentPreview;
-        string agentNoticeId="";
+        string agentNoticeId="",agentCaptureNote="";
         DateTime agentNoticeUntil;
 
         static void DisposeAgentImageAfterRun(Task task,AgentAttachmentCopy image)
@@ -78,6 +78,8 @@ namespace DeskPill
                 AddMenu(menu,"Previous window: "+agentScreenTarget.Title,delegate{CaptureAgentContext("window");});
                 AddMenu(menu,"Monitor containing that window…",delegate{CaptureAgentContext("monitor");});
             }
+            else
+                AddMenu(menu,"Current monitor…",delegate{CaptureAgentContext("monitor");});
             if(agentAttachments.ContainsKey(p.Id))AddMenu(menu,"Remove attached image",delegate{ClearAgentAttachment(p.Id);RefreshAgentViews();});
             OpenAgentMenu(menu);
         }
@@ -86,21 +88,37 @@ namespace DeskPill
             string id=agentDetailId;var p=state.Agents.FirstOrDefault(a=>a.Id==id);
             if(p==null||agentCapturing||AgentVoiceActive||Agents.Get(id).Running||!AgentTools.SupportsImages(p.Provider))return;
             CloseAgentPreview();var target=agentScreenTarget;var paste=agentPasteTarget;
-            double opacity=Opacity;bool hit=IsHitTestVisible;AgentAttachment result=null;
-            agentCapturing=true;RefreshAgentViews();
+            double opacity=Opacity>0.05?Opacity:1.0;bool hit=IsHitTestVisible;AgentAttachment result=null;
+            agentCaptureNote="";agentCapturing=true;RefreshAgentViews();
             try{
                 Opacity=0;IsHitTestVisible=false;
                 await Dispatcher.InvokeAsync(delegate{},System.Windows.Threading.DispatcherPriority.Render);await Task.Delay(70);
                 if(stopping)return;
                 if(kind=="area")result=await AgentVision.CaptureAreaAsync(this);
-                else if(target==null)throw new InvalidOperationException("Return to your app, then open Agents again to select it.");
-                else if(kind=="window")result=await AgentVision.CaptureWindowAsync(target);
-                else result=await AgentVision.CaptureMonitorAsync(target);
+                else if(kind=="window"){
+                    if(target==null)throw new InvalidOperationException("Return to your app, then open Agents again to select it.");
+                    result=await AgentVision.CaptureWindowAsync(target);
+                }
+                else result=target!=null?await AgentVision.CaptureMonitorAsync(target):await AgentVision.CaptureMonitorByHandleAsync(hwnd);
                 if(result!=null&&!stopping&&agentDetailId==id&&pose==NotchPose.InlineAgents&&state.Agents.Any(a=>a.Id==id)){
                     ClearAgentAttachment(id);agentAttachments[id]=result;agentAttachmentTargets[id]=paste;result=null;
                 }
-            }catch(Exception e){if(!stopping)Notify("Screen attachment: "+e.Message);}
-            finally{if(result!=null)result.Dispose();agentCapturing=false;if(!stopping){Opacity=opacity;IsHitTestVisible=hit;RefreshAgentViews();}}
+            }catch(Exception e){
+                if(!stopping){
+                    agentCaptureNote="Screen: "+e.Message;
+                    if(pose!=NotchPose.InlineAgents)Notify("Screen attachment: "+e.Message);
+                }
+            }
+            finally{
+                if(result!=null)result.Dispose();
+                agentCapturing=false;
+                if(!stopping){
+                    Opacity=opacity;IsHitTestVisible=hit;RefreshAgentViews();
+                    if(!RuntimeProbeMode&&!capture&&!preview&&pose==NotchPose.InlineAgents&&agentPrompt!=null){
+                        Activate();agentPrompt.Focus();
+                    }
+                }
+            }
         }
         Border BuildAgentAttachmentChip()
         {
@@ -121,10 +139,10 @@ namespace DeskPill
             CloseAgentPreview();
             var panel=new DockPanel{Margin=new Thickness(16)};var note=Ui.Text(image.SourceLabel+" · "+image.CapturedUtc.ToLocalTime().ToString("g")+" · "+profile.Provider,12,Ui.White);note.TextWrapping=TextWrapping.Wrap;DockPanel.SetDock(note,Dock.Top);panel.Children.Add(note);
             panel.Children.Add(new Image{Source=image.Preview,Stretch=Stretch.Uniform,Margin=new Thickness(0,10,0,0)});
-            var window=new Window{Owner=this,Title="Review screen attachment",Width=640,Height=440,MinWidth=320,MinHeight=220,Background=Ui.Card,Content=panel,Topmost=true,ShowInTaskbar=false};agentAttachmentPreview=window;window.Closed+=delegate{if(agentAttachmentPreview==window)agentAttachmentPreview=null;};window.Show();
+            var window=new Window{Owner=this,Title="Review screen attachment",Width=640,Height=440,MinWidth=320,MinHeight=220,Background=Ui.Card,Content=panel,Topmost=true,ShowInTaskbar=false,ShowActivated=true};agentAttachmentPreview=window;window.PreviewKeyDown+=delegate(object s,KeyEventArgs e){if(e.Key==Key.Escape){e.Handled=true;window.Close();}};window.Closed+=delegate{if(agentAttachmentPreview==window)agentAttachmentPreview=null;};window.Show();
         }
         void CloseAgentPreview(){if(agentAttachmentPreview!=null){var w=agentAttachmentPreview;agentAttachmentPreview=null;w.Close();}}
-        void ClearAgentAttachment(string id){CloseAgentPreview();AgentAttachment image;if(agentAttachments.TryGetValue(id,out image)){agentAttachments.Remove(id);image.Dispose();}agentAttachmentTargets.Remove(id);}
+        void ClearAgentAttachment(string id){agentCaptureNote="";CloseAgentPreview();AgentAttachment image;if(agentAttachments.TryGetValue(id,out image)){agentAttachments.Remove(id);image.Dispose();}agentAttachmentTargets.Remove(id);}
         void CleanupAgentExperience(){CloseAgentPreview();foreach(var image in agentAttachments.Values)image.Dispose();agentAttachments.Clear();foreach(var image in agentRunImages.Values)image.Dispose();agentRunImages.Clear();agentAttachmentTargets.Clear();agentReplyTargets.Clear();agentScreenTarget=null;agentPasteTarget=null;}
         void ObserveAgentTransitions()
         {

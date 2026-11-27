@@ -270,6 +270,8 @@ namespace DeskPill
 
             MouseEnter += delegate
             {
+                if (!open)
+                    TrackAgentContext();
                 EnsureHoverWatch();
                 PollHoverState();
                 if (compactMascot != null)
@@ -321,6 +323,7 @@ namespace DeskPill
             {
                 if (e.Key == Key.Escape)
                 {
+                    if(agentCapturing){e.Handled=true;return;}
                     if(agentPicker!=null&&agentPicker.IsDropDownOpen){agentPicker.IsDropDownOpen=false;e.Handled=true;return;}
                     if(agentHomePicker!=null&&agentHomePicker.IsDropDownOpen){agentHomePicker.IsDropDownOpen=false;e.Handled=true;return;}
                     if(agentSpeech!=null){CancelAgentVoice();e.Handled=true;return;}
@@ -1218,6 +1221,7 @@ namespace DeskPill
 
         void SetOpen(bool value)
         {
+            if(value && !open)TrackAgentContext();
             if(!value && pose==NotchPose.InlineAgents)PreserveAgentDraft();
             if(!value)CloseVolumeMenu();
             if(value && dictation!=null && dictation.Active)dictation.Cancel();

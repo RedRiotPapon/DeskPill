@@ -59,6 +59,14 @@ class InteractionTests {
     Call(w,"ShowAgentConversation",b.Id);Check(((Border)Field(w,"agentAttachmentChip")).Visibility==Visibility.Collapsed,"Attachment crossed agent destinations");Call(w,"ShowAgentConversation",a.Id);Check(((Border)Field(w,"agentAttachmentChip")).Visibility==Visibility.Visible&&File.Exists(file),"Switching discarded draft attachment");Call(w,"ClearAgentAttachment",a.Id);Check(!File.Exists(file),"Removing image left private capture behind");
    }finally{Call(w,"Cleanup");}
   });
+  Test("Screen capture errors surface inline on the agent status line without closing",delegate {
+   var w=Island();try{var state=(AppState)Field(w,"state");var p=new AgentProfile{Name="Screen check"};state.Agents.Add(p);Call(w,"ShowAgentConversation",p.Id);
+    Call(w,"CaptureAgentContext","window");var pump=new DispatcherFrame();var wait=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(20)};int ticks=0;
+    wait.Tick+=delegate{if(!(bool)Field(w,"agentCapturing")||++ticks>50)pump.Continue=false;};wait.Start();Dispatcher.PushFrame(pump);wait.Stop();
+    Check(!(bool)Field(w,"agentCapturing")&&Convert.ToString(Field(w,"pose"))=="InlineAgents"&&((TextBlock)Field(w,"agentDetailStatus")).Text.StartsWith("Screen:"),"Capture failure was hidden instead of updating inline status");
+    Check(!((DispatcherTimer)Field(w,"closeTimer")).IsEnabled&&w.Opacity>=0.99,"Capture error started close timer or left notch hidden");
+   }finally{Call(w,"Cleanup");}
+  });
   Test("Running work may collapse but capture protects interaction and newer drafts",delegate {
    var w=Island();try{var state=(AppState)Field(w,"state");var p=new AgentProfile();state.Agents.Add(p);Call(w,"ShowAgentConversation",p.Id);((TextBox)Field(w,"agentPrompt")).Text="Keep draft";var session=((AgentHub)Field(w,"agentHub")).Get(p.Id);session.GetType().GetField("running",Private).SetValue(session,true);Check((bool)w.GetType().GetMethod("CanAutoClose",Private).Invoke(w,null),"Running work forces notch to stay open");w.GetType().GetField("agentCapturing",Private).SetValue(w,true);Check(!(bool)w.GetType().GetMethod("CanAutoClose",Private).Invoke(w,null),"Capture can collapse during selection");w.GetType().GetField("agentCapturing",Private).SetValue(w,false);Call(w,"SetOpen",false);Check(session.Draft=="Keep draft","Auto-collapse lost draft");}finally{Call(w,"Cleanup");}
   });

@@ -24,10 +24,16 @@ internal static class AgentVisionTests
             Check(AgentCapturePicker.SelectionBounds(100, 100, -3000, -200, desktop) == new Rectangle(-3000, -200, 3100, 300), "Reverse drag keeps physical coordinates across DPI boundary");
             Check(AgentCapturePicker.SelectionBounds(-5000, -600, 4000, 3000, desktop) == desktop, "Area clipped to physical virtual desktop");
             string original = null, copy = null;
-            using (var bitmap = new Bitmap(100, 80))
+            using (var bitmap = new Bitmap(200, 200))
             {
                 using (var g = Graphics.FromImage(bitmap)) g.Clear(Color.Black);
                 Check(AgentVision.IsBlack(bitmap), "Black capture rejected");
+                using (var g = Graphics.FromImage(bitmap))
+                {
+                    g.Clear(Color.Black);
+                    g.FillRectangle(Brushes.White, 17, 19, 4, 12);
+                }
+                Check(!AgentVision.IsBlack(bitmap), "Thin light stroke on black background accepted");
                 using (var g = Graphics.FromImage(bitmap)) g.Clear(Color.CornflowerBlue);
                 Check(!AgentVision.IsBlack(bitmap), "Visible content accepted");
                 AgentAttachment attachment = AgentVision.Save(bitmap, "Synthetic test image");
@@ -35,7 +41,7 @@ internal static class AgentVisionTests
                 {
                     original = attachment.FilePath;
                     Check(File.Exists(original) && Path.GetExtension(original) == ".png", "PNG exists during draft ownership");
-                    Check(attachment.Preview.IsFrozen && attachment.Preview.PixelWidth == 100, "Preview frozen and loaded independently");
+                    Check(attachment.Preview.IsFrozen && attachment.Preview.PixelWidth == 200, "Preview frozen and loaded independently");
                     Check(attachment.SourceLabel == "Synthetic test image" && attachment.CapturedUtc.Kind == DateTimeKind.Utc, "Review metadata retained");
                     using (var owned = attachment.CopyForRun())
                     {
@@ -43,7 +49,7 @@ internal static class AgentVisionTests
                         Check(copy != original && File.Exists(copy), "Run gets independent file");
                         attachment.Dispose();
                         Check(!File.Exists(original) && File.Exists(copy), "Removing draft preserves owned run image");
-                        using (var reopened = new Bitmap(copy)) Check(reopened.Width == 100 && reopened.Height == 80, "Run copy is valid PNG");
+                        using (var reopened = new Bitmap(copy)) Check(reopened.Width == 200 && reopened.Height == 200, "Run copy is valid PNG");
                         bool rejected = false;
                         try { attachment.CopyForRun(); } catch (ObjectDisposedException) { rejected = true; }
                         Check(rejected, "Disposed draft cannot create another copy");
