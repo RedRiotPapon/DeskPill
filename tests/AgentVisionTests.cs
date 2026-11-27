@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.IO;
 using DeskPill;
@@ -34,6 +34,9 @@ internal static class AgentVisionTests
                     g.FillRectangle(Brushes.White, 17, 19, 4, 12);
                 }
                 Check(!AgentVision.IsBlack(bitmap), "Thin light stroke on black background accepted");
+                using (var g = Graphics.FromImage(bitmap)) g.Clear(Color.Black);
+                bitmap.SetPixel(17,19,Color.White);
+                Check(!AgentVision.IsBlack(bitmap), "Single light pixel between old sample points is not a blocked capture");
                 using (var g = Graphics.FromImage(bitmap)) g.Clear(Color.CornflowerBlue);
                 Check(!AgentVision.IsBlack(bitmap), "Visible content accepted");
                 AgentAttachment attachment = AgentVision.Save(bitmap, "Synthetic test image");

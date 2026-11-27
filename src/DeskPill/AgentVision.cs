@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -244,13 +244,12 @@ namespace DeskPill
             {
                 int absStride = Math.Abs(data.Stride);
                 byte[] row = new byte[absStride];
-                int stepY = Math.Max(1, Math.Min(4, bitmap.Height / 40));
-                int stepX = Math.Max(1, Math.Min(4, bitmap.Width / 40));
-                for (int y = 0; y < bitmap.Height; y += stepY)
+                // Images are bounded to 2048px; scan every pixel so thin text cannot fall between samples.
+                for (int y = 0; y < bitmap.Height; y++)
                 {
                     IntPtr rowPtr = new IntPtr(data.Scan0.ToInt64() + (long)y * data.Stride);
                     Marshal.Copy(rowPtr, row, 0, absStride);
-                    for (int x = 0; x < bitmap.Width; x += stepX)
+                    for (int x = 0; x < bitmap.Width; x++)
                     {
                         int offset = x * 4;
                         if (row[offset] > 3 || row[offset + 1] > 3 || row[offset + 2] > 3)
