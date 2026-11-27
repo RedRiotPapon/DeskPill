@@ -41,6 +41,33 @@ class InteractionTests {
  }
  [STAThread] static int Main() {
   var app=new Application {ShutdownMode=ShutdownMode.OnExplicitShutdown};Ui.Init(app);System.Threading.SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(app.Dispatcher));
+  Test("Connect opens a visible owned editor without blocking the notch and Cancel restores interaction",delegate {
+   var w=Island();w.GetType().GetProperty("RuntimeProbeMode",Private).SetValue(w,true,null);w.Show();Call(w,"SelectPage","Agents");
+   Exception failure=null;bool inspected=false;var timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(100)};
+   timer.Tick+=delegate{timer.Stop();var editor=(Window)Field(w,"agentEditor");try{Check(editor!=null&&editor.IsVisible,"Connect editor was not shown");Check(editor.Owner==w&&editor.Topmost,"Editor can fall behind the topmost notch or another app");Check(w.IsEnabled,"Connect disabled the notch in a modal loop");inspected=true;}catch(Exception e){failure=e;}finally{if(editor!=null)editor.Close();}};timer.Start();
+   try{Controls<Button>(w).Single(b=>Convert.ToString(b.Content)=="Connect agent").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+    if(!inspected&&failure==null){var frame=new DispatcherFrame();w.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle,new Action(delegate{frame.Continue=false;}));Dispatcher.PushFrame(frame);}
+    timer.Stop();var editor=(Window)Field(w,"agentEditor");if(editor!=null){Check(editor.Owner==w&&editor.Topmost&&w.IsEnabled,"Connection editor is unowned or modal");editor.Close();inspected=true;}
+    if(failure!=null)throw failure;Check(inspected&&Field(w,"agentEditor")==null&&w.IsEnabled&&!(bool)Field(w,"pinned"),"Cancel did not return to usable notch");
+   }finally{timer.Stop();var editor=(Window)Field(w,"agentEditor");if(editor!=null)editor.Close();Call(w,"Cleanup");w.Hide();}
+  });
+  Test("Connection editor saves once without a modal loop and repeated Connect reuses it",delegate {
+   var w=Island();w.GetType().GetProperty("RuntimeProbeMode",Private).SetValue(w,true,null);w.Show();Call(w,"SelectPage","Agents");
+   try{Call(w,"EditAgentConnection",new object[]{null});var editor=(Window)Field(w,"agentEditor");Check(editor!=null&&w.IsEnabled,"Connect blocked the app");Call(w,"EditAgentConnection",new object[]{null});Check(Field(w,"agentEditor")==editor,"Repeated Connect opened duplicate setup windows");
+    ((TextBox)Field(editor,"name")).Text="Fixture connection";((TextBox)Field(editor,"executable")).Text=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"AgentFixture.exe");((TextBox)Field(editor,"workspace")).Text=AppDomain.CurrentDomain.BaseDirectory;
+    Controls<Button>(editor).Single(b=>Convert.ToString(b.Content)=="Connect agent").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));var state=(AppState)Field(w,"state");
+    Check(Field(w,"agentEditor")==null&&state.Agents.Count==1&&state.SelectedAgent==state.Agents[0].Id&&w.IsEnabled,"Save failed to close and add one connection");
+    Call(w,"EditAgentConnection",state.Agents[0]);var edit=(Window)Field(w,"agentEditor");((TextBox)Field(edit,"name")).Text="Discard this name";Controls<Button>(edit).Single(b=>Convert.ToString(b.Content)=="Cancel").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+    Check(Field(w,"agentEditor")==null&&state.Agents.Count==1&&state.Agents[0].Name=="Fixture connection"&&w.IsEnabled,"Cancel changed connection or left the app disabled");
+   }finally{var editor=(Window)Field(w,"agentEditor");if(editor!=null)editor.Close();Call(w,"Cleanup");w.Hide();}
+  });
+  Test("Modeless setup cannot change a newly running connection or resurrect a removed one",delegate {
+   var w=Island();w.GetType().GetProperty("RuntimeProbeMode",Private).SetValue(w,true,null);w.Show();var state=(AppState)Field(w,"state");var a=new AgentProfile{Name="Original connection",Executable=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"AgentFixture.exe"),Workspace=AppDomain.CurrentDomain.BaseDirectory};state.Agents.Add(a);Call(w,"SelectPage","Agents");
+   try{Call(w,"EditAgentConnection",a);var editor=(Window)Field(w,"agentEditor");((TextBox)Field(editor,"name")).Text="Pending changes";var hub=(AgentHub)Field(w,"agentHub");hub.SendAsync(a,"hold");
+    Controls<Button>(editor).Single(b=>Convert.ToString(b.Content)=="Save connection").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Check(Field(w,"agentEditor")==editor&&state.Agents[0].Name=="Original connection"&&((TextBlock)Field(editor,"error")).Text.Contains("Stop"),"Setup changed a connection while its run was active");
+    PumpUntil(hub.StopAsync(a.Id));state.Agents.Remove(a);Controls<Button>(editor).Single(b=>Convert.ToString(b.Content)=="Save connection").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Check(state.Agents.Count==0&&Field(w,"agentEditor")==editor&&((TextBlock)Field(editor,"error")).Text.Contains("removed"),"Setup resurrected a removed connection");
+   }finally{var editor=(Window)Field(w,"agentEditor");if(editor!=null)editor.Close();Call(w,"Cleanup");w.Hide();}
+  });
   Test("Agents is separate and creates no runtime while using Music",delegate {
    var w=Island();Check(Field(w,"agentHub")==null && Convert.ToString(Field(w,"page"))=="Music","Music started agent work");
    Call(w,"SelectPage","Agents");Check(Controls<Button>(w).Any(b=>Convert.ToString(b.Content)=="Connect agent"),"Agents onboarding has no connect action");

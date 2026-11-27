@@ -188,20 +188,26 @@ namespace DeskPill
             if(profile!=null&&Agents.Get(profile.Id).Running){Notify("Stop this agent before editing its connection.");return;}
             if(profile==null&&state.Agents.Count>=20){Notify("Up to 20 agent connections are supported.");return;}
             PreserveAgentDraft();
-            var editor=new AgentConnectionWindow(profile);agentEditor=editor;
+            var editor=new AgentConnectionWindow(profile){Owner=this,Topmost=true,ShowActivated=true};agentEditor=editor;
+            editor.SaveError=delegate{
+                if(profile!=null&&!state.Agents.Contains(profile))return "This connection was removed. Cancel to return to Agents.";
+                if(profile!=null&&Agents.Get(profile.Id).Running)return "Stop this run before saving connection changes.";
+                return "";
+            };
             bool wasPinned=pinned;pinned=true;
-            try
+            editor.Closed+=delegate
             {
-                if(editor.ShowDialog()==true)
-                {
-                    var result=editor.Result;int index=profile==null?-1:state.Agents.IndexOf(profile);
-                    if(index<0)state.Agents.Add(result);else state.Agents[index]=result;
-                    state.SelectedAgent=result.Id;Save();
-                    if(IsInlinePose(pose))ExitInlineView();page="Agents";SetOpen(true);RebuildCurrentPage(true);
-                }
-            }
-            finally{agentEditor=null;pinned=wasPinned;}
+                agentEditor=null;pinned=wasPinned;
+                if(stopping||editor.Result==null)return;
+                var result=editor.Result;int index=profile==null?-1:state.Agents.IndexOf(profile);
+                if(index<0)state.Agents.Add(result);else state.Agents[index]=result;
+                state.SelectedAgent=result.Id;Save();
+                if(IsInlinePose(pose))ExitInlineView();page="Agents";SetOpen(true);RebuildCurrentPage(true);
+            };
+            try{editor.Show();editor.Activate();}
+            catch(Exception e){agentEditor=null;pinned=wasPinned;editor.Close();Notify("Could not open agent setup: "+e.Message);}
         }
+
         void HideAgentsPage()
         {
             if(state.Settings.VisiblePages().Length<=1){Notify("Keep at least one page visible. Choose pages in Settings.");return;}

@@ -18,6 +18,7 @@ namespace DeskPill
         readonly AgentProfile original;
         string previousProvider="";
         public AgentProfile Result { get; private set; }
+        public Func<string> SaveError;
         public AgentConnectionWindow(AgentProfile existing)
         {
             original=existing;
@@ -74,11 +75,12 @@ namespace DeskPill
         }
         void Save()
         {
+            string blocked=SaveError==null?"":SaveError();if(!string.IsNullOrEmpty(blocked)){error.Text=blocked;return;}
             var result=new AgentProfile{Id=original==null?Guid.NewGuid().ToString("N"):original.Id,Name=name.Text.Trim(),Provider=Convert.ToString(provider.SelectedItem),Executable=executable.Text.Trim(),Workspace=workspace.Text.Trim(),AllowEdits=Convert.ToString(provider.SelectedItem)=="Codex CLI"&&edits.IsChecked==true};
             string problem=AgentTools.Validate(result);
             if(!string.IsNullOrEmpty(problem)){error.Text=problem;return;}
             if(result.Name.Length==0 || result.Name.Length>60){error.Text="Give the connection a name between 1 and 60 characters.";return;}
-            Result=result;DialogResult=true;
+            Result=result;Close();
         }
     }
 }
