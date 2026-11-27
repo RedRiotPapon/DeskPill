@@ -51,7 +51,7 @@ namespace DeskPill
         };
         public static bool Matches(Settings settings, string executable, bool fullscreen, bool graphics, bool desktopClass)
         {
-            if (!settings.GameOverlay || string.IsNullOrWhiteSpace(executable))
+            if (string.IsNullOrWhiteSpace(executable))
                 return false;
             if ((settings.GameApps ?? new string[0]).Contains(executable, StringComparer.OrdinalIgnoreCase))
                 return true;

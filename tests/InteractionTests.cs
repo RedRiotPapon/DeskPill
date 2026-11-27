@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Threading.Tasks;
 using System.Windows.Threading;
 using DeskPill;
@@ -26,6 +27,11 @@ class InteractionTests {
  static IslandWindow Island() {
   var state=new AppState();state.Settings.Sound=false;state.Settings.ClipboardEnabled=false;state.Settings.FastAnimations=true;
   return new IslandWindow(state,new StateStore(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"fixture")),true,true);
+ }
+ static int InkPixels(FrameworkElement element) {
+  element.Measure(new Size(100,42));element.Arrange(new Rect(0,0,100,42));element.UpdateLayout();
+  var image=new RenderTargetBitmap(100,42,96,96,PixelFormats.Pbgra32);image.Render(element);var pixels=new byte[100*42*4];image.CopyPixels(pixels,400,0);
+  int count=0;for(int i=3;i<pixels.Length;i+=4)if(pixels[i]>30)count++;return count;
  }
  [STAThread] static int Main() {
   var app=new Application {ShutdownMode=ShutdownMode.OnExplicitShutdown};Ui.Init(app);
@@ -89,18 +95,84 @@ class InteractionTests {
    Check(Themes.Current=="Glass" && fill.GradientStops.Last().Color.A<140 && ((SolidColorBrush)((TextBlock)Field(w,"compactText")).Foreground).Color.A==255,"Glass faded content or stayed opaque");
    settings.Close();Check(Themes.Current=="Classic" && ((GradientBrush)((System.Windows.Shapes.Path)Field(w,"shell")).Fill).GradientStops.Last().Color.A==255,"Cancel retained Glass alpha");Call(w,"Cleanup");
   });
+  Test("Detected games tuck away with Game mode off and restore the saved theme",delegate {
+   var w=Island();
+   Call(w,"SetGameMode",new GameWindow {ProcessId=123,Matches=true});
+   Check((bool)Field(w,"gameDetected") && !(bool)Field(w,"gameModeActive") && Convert.ToString(Field(w,"pose"))=="Tiny" && Themes.Current=="Classic","Disabled overlay failed to tuck or changed the theme");
+   Call(w,"ToggleGameMode");
+   Check(((AppState)Field(w,"state")).Settings.GameOverlay && (bool)Field(w,"gameModeActive") && Convert.ToString(Field(w,"pose"))=="Compact","Tray toggle did not enable the overlay");
+   var fill=(LinearGradientBrush)Themes.ShellFill;
+   Check(fill.GradientStops.Last().Color.A<=57,"Game glass was not low opacity");
+   Call(w,"ToggleGameMode");Check(Convert.ToString(Field(w,"pose"))=="Tiny" && Themes.Current=="Classic","Switching game mode off did not restore the tuck");
+   Call(w,"SetGameMode",new GameWindow());Check(Convert.ToString(Field(w,"pose"))=="Compact","Leaving the game did not restore the notch");Call(w,"Cleanup");
+  });
+  Test("Dictation stays inside the notch through listening processing review and dismissal",delegate {
+   var w=Island();var windows=Application.Current.Windows.Count;
+   var type=typeof(IslandWindow).Assembly.GetType("DeskPill.DictationView");
+   Action cancel=delegate{};
+   var view=(FrameworkElement)Activator.CreateInstance(type,new object[]{cancel,cancel});
+   Call(w,"ShowDictation",view);
+   Check(Application.Current.Windows.Count==windows && Convert.ToString(Field(w,"pose"))=="Dictation","Dictation created another window or failed to use the notch");
+   Check(ReferenceEquals(view.Parent,Field(w,"hudLayer")),"Voice view is outside the notch");
+   Call(w,"SetTabOverlapForProbe",true);Check(Convert.ToString(Field(w,"pose"))=="Dictation","An overlap update hid live dictation");
+   Call(w,"SetTabOverlapForProbe",false);Check(Convert.ToString(Field(w,"pose"))=="Dictation","A cleared overlap hid live dictation");
+   type.GetMethod("Listening").Invoke(view,new object[]{4,.6});
+   Check(Controls<TextBlock>(view).Any(x=>x.Text.Contains("Release to insert")),"Hold-to-talk instructions missing");
+   type.GetMethod("Processing").Invoke(view,null);
+   Check(Controls<TextBlock>(view).Any(x=>x.Text.Contains("Turning speech")),"Processing state missing");
+   Action<string,bool> accept=delegate{};
+   type.GetMethod("Review").Invoke(view,new object[]{"A retained transcript",accept});
+   Call(w,"SetPose",NotchPose.Dictation);
+   Check(((FrameworkElement)Field(w,"expandedLayer")).Opacity==0,"Transcript review exposed an unrelated dashboard underneath");
+   Check(Controls<TextBox>(view).Single().Text=="A retained transcript" && view.Height>100,"Inline fallback review lost the transcript");
+   Call(w,"HideDictation",view);
+   Check(view.Parent==null && Convert.ToString(Field(w,"pose"))=="Compact","Dictation dismissal failed to restore the notch");Call(w,"Cleanup");
+  });
+  Test("Reduced-motion voice display still responds to actual microphone levels",delegate {
+   bool motion=Ui.MotionEnabled;Ui.MotionEnabled=false;
+   try {
+    var type=typeof(IslandWindow).Assembly.GetType("DeskPill.DictationWaveform");var wave=(FrameworkElement)Activator.CreateInstance(type);
+    type.GetProperty("Level").SetValue(wave,0.0,null);int quiet=InkPixels(wave);
+    type.GetProperty("Level").SetValue(wave,1.0,null);int loud=InkPixels(wave);
+    Check(loud>quiet*2,"Voice display did not reflect microphone input with motion disabled");
+    Check(!(bool)type.GetField("attached",Private).GetValue(wave),"Reduced motion attached a continuous render loop");
+   }finally{Ui.MotionEnabled=motion;}
+  });
+  Test("Voice rendering detaches when the dictation view leaves the notch",delegate {
+   var w=Island();w.GetType().GetProperty("RuntimeProbeMode",Private).SetValue(w,true,null);w.Show();bool motion=Ui.MotionEnabled;Ui.MotionEnabled=true;
+   try {
+    var type=typeof(IslandWindow).Assembly.GetType("DeskPill.DictationView");Action empty=delegate{};var view=(FrameworkElement)Activator.CreateInstance(type,new object[]{empty,empty});Call(w,"ShowDictation",view);
+    var frame=new DispatcherFrame();w.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle,new Action(delegate{frame.Continue=false;}));Dispatcher.PushFrame(frame);
+    var wave=type.GetField("orb",Private).GetValue(view);
+    Check((bool)wave.GetType().GetField("attached",Private).GetValue(wave)==Ui.AnimationsAllowed,"Visible voice rendering failed to respect motion settings");
+    Call(w,"HideDictation",view);
+    frame=new DispatcherFrame();w.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle,new Action(delegate{frame.Continue=false;}));Dispatcher.PushFrame(frame);
+    Check(!(bool)wave.GetType().GetField("attached",Private).GetValue(wave),"Dismissed dictation retained its frame callback");
+   }finally{Ui.MotionEnabled=motion;Call(w,"Cleanup");w.Hide();}
+  });
+  Test("A release during microphone preparation is retained and cancellation clears it",delegate {
+   var w=Island();var type=typeof(IslandWindow).Assembly.GetType("DeskPill.DictationController");
+   var controller=Activator.CreateInstance(type,new object[]{w,new Settings(),new Action<string>(delegate{}),new Action(delegate{})});
+   var token=new System.Threading.CancellationTokenSource();type.GetField("session",Private).SetValue(controller,token);
+   type.GetMethod("Finish").Invoke(controller,null);
+   Check((bool)type.GetField("finishPending",Private).GetValue(controller),"An early release was discarded");
+   type.GetMethod("Cancel").Invoke(controller,null);
+   Check(token.IsCancellationRequested && !(bool)type.GetField("finishPending",Private).GetValue(controller),"Cancellation left a pending recording");
+   ((IDisposable)controller).Dispose();Call(w,"Cleanup");
+  });
   Test("Game overlay temporarily uses Glass and restores saved theme and style",delegate {
-   var w=Island();var state=(AppState)Field(w,"state");state.WaterMl=1000;string saved=state.Settings.Theme;
+   var w=Island();var state=(AppState)Field(w,"state");state.Settings.GameOverlay=true;state.WaterMl=1000;string saved=state.Settings.Theme;
    Call(w,"SetGameMode",new GameWindow {ProcessId=123,Executable="fixture.exe",Matches=true});
    Check(Themes.Current=="Glass" && state.Settings.Theme==saved && Convert.ToString(Field(w,"pose"))=="Compact" && ((TextBlock)Field(w,"compactText")).Text.Contains("FPS"),"Game overlay did not stay compact or changed saved theme");
    Check(((Ring)Field(w,"compactRing")).Progress==0,"Game icon retained an unrelated water progress arc");
    Call(w,"SetGameMode",new GameWindow());Check(Themes.Current==saved && !(bool)Field(w,"gameModeActive"),"Game exit did not restore saved appearance");Call(w,"Cleanup");
   });
   Test("Game overlay toggles native input pass-through and restores it",delegate {
-   var w=Island();w.GetType().GetProperty("RuntimeProbeMode",Private).SetValue(w,true,null);w.Show();
+   var w=Island();((AppState)Field(w,"state")).Settings.GameOverlay=true;w.GetType().GetProperty("RuntimeProbeMode",Private).SetValue(w,true,null);w.Show();
    var handle=new WindowInteropHelper(w).Handle;
    Call(w,"SetGameMode",new GameWindow {ProcessId=123,Matches=true});
    Check((GameWindowStyle(handle)&0x20)!=0,"Game overlay still intercepted mouse input");
+   Call(w,"ToggleGameMode");Check((GameWindowStyle(handle)&0x20)!=0 && Convert.ToString(Field(w,"pose"))=="Tiny" && Field(w,"gameCapture")==null,"Disabled game mode intercepted input or kept FPS capture");
    Call(w,"SetGameMode",new GameWindow());Check((GameWindowStyle(handle)&0x20)==0,"Game exit left the notch unclickable");Call(w,"Cleanup");w.Hide();
   });
   Test("Motion reset restores defaults and Save persists a custom profile",delegate {

@@ -1,4 +1,4 @@
-# DeskPill 1.3
+# DeskPill 1.4
 
 Native Windows desktop notch with Music, Shelf, Focus, Water and Tasks. Hide unused pages without deleting their data. Classic, Glass, seven colored skins and a Custom palette support live preview.
 
@@ -8,8 +8,8 @@ Ctrl+Alt+V opens searchable text clipboard history. Select a result and press En
 
 Also includes Windows media controls, OCR, focus timers, hydration tracking, tasks, calendar import and optional online tools. See the README for privacy behavior and limitations, and [performance measurements](PERFORMANCE.md) for measured coverage. Hardware-dependent checks require an interactive Windows desktop.
 
-Optional English dictation is built into DeskPill: one-time verified speech-pack setup, Win+Space start/finish, Esc cancellation, input-reactive listening motion, a 90-second cap, review after foreground changes, and guarded paste. The independent worker releases its offline model after each transcription. Dictation is off by default; enabling it takes over the Windows language-switch shortcut. English recognition was checked with generated audio without microphone or clipboard access; live microphone hardware and physical shortcut behavior still need user verification.
+Optional English dictation is built into DeskPill: one-time verified speech-pack setup, hold Win+Space to speak and release to insert, Esc cancellation, an input-reactive waveform inside the notch, a 90-second cap, review after foreground changes, and guarded paste. The independent worker releases its offline model after each transcription. Dictation is off by default; enabling it takes over the Windows language-switch shortcut. English recognition was checked with generated audio without microphone or clipboard access; live microphone hardware and physical shortcut behavior still need user verification.
 
 Settings → Motion provides opening/options delays, closing grace and spring pace with live preview, reset and cancellation. Glass appears directly after Classic, with opacity and highlight controls. It uses tinted translucency without a backdrop blur.
 
-Optional game mode switches temporarily to compact, input-transparent Glass while the foreground game matches a saved executable or fullscreen graphics heuristic. FPS is measured from PresentMon presentation intervals. Windows trace access is required; the current non-elevated test session verified the unavailable state, not live game FPS. The saved theme and pointer behavior restore on game exit.
+Game mode is available from the tray right-click menu and switches temporarily to compact, input-transparent Glass at 22% shell opacity while the foreground game matches a saved executable or fullscreen graphics heuristic. FPS is measured from PresentMon presentation intervals. Windows trace access is required; the current non-elevated test session verified the unavailable state, not live game FPS. With Game mode off, matching games tuck the notch into its tiny state without FPS capture. The saved theme and pointer behavior restore on game exit.

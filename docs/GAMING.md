@@ -1,6 +1,6 @@
 # Optional game glass and FPS
 
-Game mode is off by default. Enable it in Settings → Gaming. While a matching game is in front, DeskPill temporarily uses a compact Floating Glass surface with the saved Glass opacity/highlight values. The window passes mouse input through. Hover expansion and ordinary HUD peeks pause so the notch cannot interrupt game input. The saved theme and style return when the game loses focus; normal fullscreen hiding still applies to other apps.
+Game mode is off by default. Switch it from the tray icon’s right-click menu, or in Settings → Gaming. While a matching game is in front, DeskPill temporarily uses a compact Floating Glass surface at 22% shell opacity with opaque lettering. Your regular Glass controls are preserved. The window passes mouse input through. Hover expansion and ordinary HUD peeks pause so the notch cannot interrupt game input. When Game mode is off, matching games tuck the notch into its tiny, mouse-transparent state and never start FPS capture. The saved theme and style return when the game loses focus; normal fullscreen hiding still applies to other apps.
 
 ## Detection
 

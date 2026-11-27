@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -34,7 +34,7 @@ namespace DeskPill
         [DllImport("user32.dll")]
         static extern void keybd_event(byte key, byte scan, uint flags, UIntPtr extra);
         readonly Hook callback;
-        readonly Action toggle, cancel;
+        readonly Action toggle, finish, cancel;
         readonly Func<bool> active;
         readonly DictationShortcutGate gate = new DictationShortcutGate();
         IntPtr hook;
@@ -43,9 +43,15 @@ namespace DeskPill
             return (GetAsyncKeyState(key) & 0x8000) != 0;
         }
 
-        public DictationKeys(Action toggle, Action cancel, Func<bool> active)
+        internal static bool PasteModifiersHeld()
+        {
+            return Held(0x5B) || Held(0x5C) || Held(0x10) || Held(0x11) || Held(0x12);
+        }
+
+        public DictationKeys(Action toggle, Action finish, Action cancel, Func<bool> active)
         {
             this.toggle = toggle;
+            this.finish = finish;
             this.cancel = cancel;
             this.active = active;
             callback = Handle;
@@ -69,7 +75,10 @@ namespace DeskPill
                         return new IntPtr(1);
                     }
 
-                    if (gate.Process((int)key.key, down, Held(0x5B) || Held(0x5C), Held(0x10) || Held(0x11) || Held(0x12)))
+                    bool consumed = gate.Process((int)key.key, down, Held(0x5B) || Held(0x5C), Held(0x10) || Held(0x11) || Held(0x12));
+                    if (gate.FinishRequested)
+                        finish();
+                    if (consumed)
                     {
                         if (gate.ToggleRequested)
                         {
@@ -97,16 +106,34 @@ namespace DeskPill
         }
     }
 
-    sealed class SpeechOrb : FrameworkElement
+    sealed class DictationWaveform : FrameworkElement
     {
         readonly Stopwatch clock = Stopwatch.StartNew();
         bool attached;
         double displayedLevel, lastFrame;
-        public double Level;
-        public bool Processing;
-        public SpeechOrb()
+        readonly double[] levels = new double[18];
+        double sampleTime;
+        double level;
+        public double Level
         {
-            Width = Height = 44;
+            get
+            {
+                return level;
+            }
+
+            set
+            {
+                level = Math.Max(0, Math.Min(1, value));
+                if (!Ui.AnimationsAllowed)
+                    InvalidateVisual();
+            }
+        }
+
+        public bool Processing;
+        public DictationWaveform()
+        {
+            Width = 100;
+            Height = 42;
             Loaded += delegate
             {
                 Sync();
@@ -125,6 +152,7 @@ namespace DeskPill
         {
             if (IsLoaded && IsVisible && Ui.AnimationsAllowed && !attached)
             {
+                lastFrame = clock.Elapsed.TotalSeconds;
                 CompositionTarget.Rendering += Frame;
                 attached = true;
             }
@@ -153,47 +181,72 @@ namespace DeskPill
             double dt = Math.Min(.1, Math.Max(0, now - lastFrame));
             lastFrame = now;
             displayedLevel += (Level - displayedLevel) * (1 - Math.Exp(-dt / .08));
+            sampleTime += dt;
+            while (sampleTime >= .045)
+            {
+                sampleTime -= .045;
+                Array.Copy(levels, 1, levels, 0, levels.Length - 1);
+                levels[levels.Length - 1] = Math.Sqrt(Math.Max(0, Math.Min(1, displayedLevel)));
+            }
+
             InvalidateVisual();
         }
 
         protected override void OnRender(DrawingContext draw)
         {
-            double time = Ui.AnimationsAllowed ? clock.Elapsed.TotalSeconds : 0, energy = Math.Max(0, Math.Min(1, Ui.AnimationsAllowed ? displayedLevel : Level));
-            draw.DrawEllipse(null, new Pen(Ui.Line, 1), new Point(22, 22), 18, 18);
-            draw.DrawEllipse(Ui.Green, null, new Point(22, 22), 5 + energy * 5, 5 + energy * 5);
-            for (int i = 0; i < 3; i++)
+            double time = Ui.AnimationsAllowed ? clock.Elapsed.TotalSeconds : 0;
+            double energy = Math.Sqrt(Math.Max(0, Math.Min(1, Ui.AnimationsAllowed ? displayedLevel : Level)));
+            // A microphone silhouette, with a quiet breathing halo driven by actual input.
+            var pen = new Pen(Ui.Green, 1.5)
             {
-                double angle = time * (Processing ? 2.5 : .65) + i * Math.PI * 2 / 3;
-                double radius = Processing ? 13 : 12 + energy * 3;
-                draw.DrawEllipse(Ui.Green, null, new Point(22 + Math.Cos(angle) * radius, 22 + Math.Sin(angle) * radius), 1.7, 1.7);
+                StartLineCap = PenLineCap.Round,
+                EndLineCap = PenLineCap.Round
+            };
+            double lift = Processing && Ui.AnimationsAllowed ? Math.Sin(time * 3) * 1.2 : -energy;
+            draw.PushTransform(new TranslateTransform(0, lift));
+            draw.DrawRoundedRectangle(Ui.Green, null, new Rect(10, 11, 7, 13), 3.5, 3.5);
+            var arc = new StreamGeometry();
+            using (var c = arc.Open())
+            {
+                c.BeginFigure(new Point(7, 20), false, false);
+                c.ArcTo(new Point(20, 20), new Size(6.5, 8), 0, false, SweepDirection.Counterclockwise, true, false);
+            }
+
+            draw.DrawGeometry(null, pen, arc);
+            draw.DrawLine(pen, new Point(13.5, 28), new Point(13.5, 32));
+            draw.DrawLine(pen, new Point(10, 32), new Point(17, 32));
+            draw.Pop();
+            var barPen = new Pen(Ui.Green, 2.4)
+            {
+                StartLineCap = PenLineCap.Round,
+                EndLineCap = PenLineCap.Round
+            };
+            for (int i = 0; i < levels.Length; i++)
+            {
+                double amplitude = Ui.AnimationsAllowed ? levels[i] : energy;
+                double height = Processing ? 2 : 2 + amplitude * 27;
+                double y = Processing && Ui.AnimationsAllowed ? Math.Sin(time * 3.4 - i * .4) * 3 : 0;
+                double x = 31 + i * 3.8;
+                draw.DrawLine(barPen, new Point(x, 21 + y - height / 2), new Point(x, 21 + y + height / 2));
             }
         }
     }
 
-    sealed class DictationPanel : Window
+    sealed class DictationView : Border
     {
         readonly TextBlock title, help;
-        readonly SpeechOrb orb = new SpeechOrb();
+        readonly DictationWaveform orb = new DictationWaveform();
         readonly StackPanel actions;
         readonly StackPanel body;
-        readonly Action stop, cancel;
+        readonly Action cancel;
+        public bool HoldToTalk = true;
         TextBox review;
-        public DictationPanel(Window owner, Action stop, Action cancel)
+        public DictationView(Action stop, Action cancel)
         {
-            this.stop = stop;
             this.cancel = cancel;
-            Title = "DeskPill dictation";
-            Width = 360;
-            Height = 112;
-            WindowStyle = WindowStyle.None;
-            ResizeMode = ResizeMode.NoResize;
-            AllowsTransparency = true;
-            Background = Brushes.Transparent;
-            ShowInTaskbar = false;
-            ShowActivated = false;
-            Topmost = true;
-            Left = owner.Left + (owner.Width - Width) / 2;
-            Top = owner.Top + 54;
+            Width = 348;
+            Height = 70;
+            Padding = new Thickness(10, 8, 10, 6);
             title = Ui.Text("Preparing microphone…", 13, Ui.White);
             title.FontWeight = FontWeights.SemiBold;
             help = Ui.Text("English · private, on-device", 11, Ui.Muted);
@@ -201,29 +254,18 @@ namespace DeskPill
             var row = new DockPanel();
             DockPanel.SetDock(orb, Dock.Left);
             orb.Margin = new Thickness(0, 0, 12, 0);
+            orb.ToolTip = "Finish dictation";
+            orb.MouseLeftButtonUp += delegate
+            {
+                stop();
+            };
             row.Children.Add(orb);
             row.Children.Add(Ui.Column(title, help));
-            actions = Ui.Row(Ui.Button("Finish", stop), Ui.Button("Cancel", cancel));
+            actions = Ui.Row();
+            actions.Visibility = Visibility.Collapsed;
             actions.Margin = new Thickness(56, 5, 0, 0);
             body = Ui.Column(row, actions);
-            Content = new Border
-            {
-                Background = Themes.ShellFill,
-                BorderBrush = Ui.Line,
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(20),
-                Padding = new Thickness(16, 10, 16, 10),
-                Child = body
-            };
-            if (Ui.AnimationsAllowed)
-            {
-                Opacity = 0;
-                Loaded += delegate
-                {
-                    BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(1, TimeSpan.FromMilliseconds(130)));
-                };
-            }
-
+            Child = body;
             PreviewKeyDown += delegate (object s, System.Windows.Input.KeyEventArgs e)
             {
                 if (e.Key == System.Windows.Input.Key.Escape)
@@ -237,18 +279,28 @@ namespace DeskPill
         public void Listening(int seconds, double level)
         {
             title.Text = "Listening · " + seconds / 60 + ":" + (seconds % 60).ToString("00");
-            help.Text = "Win+Space finishes · Esc cancels";
+            help.Text = HoldToTalk ? "Release to insert · Esc cancels" : "Click mic to finish · Esc cancels";
             orb.Level = level;
         }
 
         public void Processing()
         {
             title.Text = "Turning speech into text…";
-            help.Text = "English · model unloads when finished";
+            help.Text = "On-device English · Esc cancels";
             orb.Processing = true;
             orb.Level = 0;
+            orb.InvalidateVisual();
             actions.Children.Clear();
-            actions.Children.Add(Ui.Button("Cancel", cancel));
+            actions.Visibility = Visibility.Collapsed;
+        }
+
+        public void WaitingForRelease()
+        {
+            title.Text = "Ready to insert";
+            help.Text = "Release shortcut keys · Esc cancels";
+            orb.Processing = false;
+            orb.Level = 0;
+            orb.InvalidateVisual();
         }
 
         public void Review(string text, Action<string, bool> accept)
@@ -259,7 +311,7 @@ namespace DeskPill
                 return;
             }
 
-            Height = 246;
+            Height = 218;
             title.Text = "Ready to use";
             help.Text = "Review your words before inserting them";
             orb.Visibility = Visibility.Collapsed;
@@ -271,6 +323,7 @@ namespace DeskPill
             input.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
             input.Margin = new Thickness(0, 10, 0, 0);
             body.Children.Insert(1, input);
+            actions.Visibility = Visibility.Visible;
             actions.Margin = new Thickness(0, 8, 0, 0);
             actions.Children.Clear();
             actions.Children.Add(Ui.Button("Paste", delegate
@@ -287,18 +340,18 @@ namespace DeskPill
 
     sealed class DictationController : IDisposable
     {
-        readonly Window owner;
+        readonly IslandWindow owner;
         readonly Settings settings;
         readonly Action<string> notify;
         readonly Action prepare;
         readonly DispatcherTimer timer = new DispatcherTimer();
         DictationKeys keys;
-        DictationPanel panel;
+        DictationView panel;
         DictationRecorder recorder;
         CancellationTokenSource session;
         PasteTarget target;
         DateTime started;
-        bool listening, disposed, reviewing;
+        bool listening, disposed, reviewing, finishPending;
         public bool Active
         {
             get
@@ -307,7 +360,7 @@ namespace DeskPill
             }
         }
 
-        public DictationController(Window owner, Settings settings, Action<string> notify, Action prepare)
+        public DictationController(IslandWindow owner, Settings settings, Action<string> notify, Action prepare)
         {
             this.owner = owner;
             this.settings = settings;
@@ -346,7 +399,10 @@ namespace DeskPill
             {
                 keys = new DictationKeys(delegate
                 {
-                    owner.Dispatcher.BeginInvoke(new Action(Toggle));
+                    owner.Dispatcher.BeginInvoke(new Action(Begin));
+                }, delegate
+                {
+                    owner.Dispatcher.BeginInvoke(new Action(Finish));
                 }, delegate
                 {
                     owner.Dispatcher.BeginInvoke(new Action(Cancel));
@@ -358,16 +414,22 @@ namespace DeskPill
             }
         }
 
-        public async void Toggle()
+        public void Toggle()
+        {
+            if (Active)
+                Finish();
+            else
+            {
+                Begin();
+                if (panel != null)
+                    panel.HoldToTalk = false;
+            }
+        }
+
+        public async void Begin()
         {
             if (disposed)
                 return;
-            if (listening)
-            {
-                Finish();
-                return;
-            }
-
             if (Active)
                 return;
             if (!settings.DictationEnabled || !SpeechAssets.Ready)
@@ -379,14 +441,10 @@ namespace DeskPill
             target = PasteTarget.Capture();
             var token = new CancellationTokenSource();
             session = token;
+            finishPending = false;
             prepare();
-            panel = new DictationPanel(owner, Finish, Cancel);
-            panel.Closed += delegate
-            {
-                if (Active)
-                    Cancel();
-            };
-            panel.Show();
+            panel = new DictationView(Finish, Cancel);
+            owner.ShowDictation(panel);
             try
             {
                 var capture = await Task.Run(() => new DictationRecorder());
@@ -401,6 +459,8 @@ namespace DeskPill
                 listening = true;
                 panel.Listening(0, 0);
                 timer.Start();
+                if (finishPending)
+                    Finish();
             }
             catch (Exception e)
             {
@@ -415,7 +475,12 @@ namespace DeskPill
         public async void Finish()
         {
             if (!listening || recorder == null)
+            {
+                if (Active && !reviewing)
+                    finishPending = true;
                 return;
+            }
+
             listening = false;
             timer.Stop();
             panel.Processing();
@@ -449,7 +514,7 @@ namespace DeskPill
 
                 reviewing = true;
                 // A changed foreground app gets review, never an unexpected focus steal or paste.
-                if (target != null && (target.IsForeground || panel.IsActive))
+                if (target != null && await DictationInsertion.WaitForReleaseAsync(DictationKeys.PasteModifiersHeld, () => target != null && target.IsForeground, panel.WaitingForRelease, token.Token))
                     await Accept(text, true);
                 else
                     panel.Review(text, async delegate (string value, bool paste)
@@ -504,6 +569,7 @@ namespace DeskPill
             timer.Stop();
             listening = false;
             reviewing = false;
+            finishPending = false;
             var token = session;
             session = null;
             if (token != null)
@@ -512,10 +578,10 @@ namespace DeskPill
             recorder = null;
             if (capture != null)
                 Task.Run((Action)capture.Dispose);
-            var window = panel;
+            var view = panel;
             panel = null;
-            if (window != null)
-                window.Close();
+            if (view != null)
+                owner.HideDictation(view);
             target = null;
         }
 

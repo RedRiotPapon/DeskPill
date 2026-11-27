@@ -166,6 +166,12 @@ namespace DeskPill
             TopTintHex[i] = (settings.CustomFinish == "Matte" ? shell : Mix(shell,surface,.5)).ToString();
         }
 
+        internal static void ConfigureGameGlass()
+        {
+            glassOpacity = 22;
+            glassHighlight = 10;
+        }
+
         public static void Apply(string name)
         {
             selected = Array.IndexOf(Names, Normalize(name));

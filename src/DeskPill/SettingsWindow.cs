@@ -526,10 +526,10 @@ namespace DeskPill
 
         StackPanel GamingOptions()
         {
-            var p = Page("Gaming", "A small glass FPS bar while your game is in front. Optional and off by default.");
-            Check(p, "Use automatic game glass & FPS", "GameOverlay");
+            var p = Page("Gaming", "Enable a subtle FPS bar for games, or leave it off to tuck the notch away.");
+            Check(p, "Game mode · translucent FPS bar", "GameOverlay");
             Check(p, "Detect fullscreen 3D games", "DetectFullscreenGames");
-            Note(p, "Detection is a best effort. Add game executable names below for reliable matching, including windowed games. Browsers and common desktop apps are excluded from automatic detection.");
+            Note(p, "You can also switch Game mode from the tray icon’s right-click menu. Its glass surface uses 22% opacity and leaves text readable. Detection is a best effort. Add game executable names below for reliable matching, including windowed games. Browsers and common desktop apps are excluded from automatic detection.");
             Label(p, "Your games · one executable name per line");
             var games = Ui.Input(string.Join("\n", draft.GameApps ?? new string[0]));
             games.Background = Ui.Card;
@@ -589,7 +589,7 @@ namespace DeskPill
         {
             var p=Page("Dictation", "English speech to text, privately on your PC. Optional and off by default.");
             Check(p,"Enable English dictation · Win+Space","DictationEnabled");
-            Note(p,"Win+Space starts recording; press it again to finish. Esc cancels. While enabled, this replaces Windows’ Win+Space language switch. Disabling restores it.");
+            Note(p,"Hold Win+Space while speaking; release to insert. The microphone waveform appears inside the notch. Esc cancels. While enabled, this replaces Windows’ Win+Space language switch. Disabling restores it.");
             Note(p,"Install the English speech pack once (about 54 MB download). Recognition runs on-device in a separate worker, which exits after each transcription to release its model memory. No microphone access while idle. Recordings are limited to 90 seconds.");
             var status=Ui.Text(SpeechAssets.Ready?"English speech pack is ready.":"English speech pack is not installed.",12,Ui.Muted);status.TextWrapping=TextWrapping.Wrap;status.Margin=new Thickness(0,12,0,8);p.Children.Add(status);
             Button install=null;install=Ui.Button("Install / repair English speech",async delegate

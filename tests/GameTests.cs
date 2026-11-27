@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using DeskPill;
 
 class GameTests
@@ -17,7 +17,7 @@ class GameTests
         try
         {
             var settings = new Settings();
-            Check(!GamePolicy.Matches(settings, "game.exe", true, true, false), "Disabled gaming never matches an app");
+            Check(GamePolicy.Matches(settings, "game.exe", true, true, false), "Game detection remains active for automatic tuck with overlay disabled");
             settings.GameOverlay = true;
             Check(GamePolicy.Matches(settings, "game.exe", true, true, false), "Fullscreen graphics app can use automatic game mode");
             Check(!GamePolicy.Matches(settings, "chrome.exe", true, true, false) && !GamePolicy.Matches(settings, "game.exe", true, true, true), "Browsers and desktop window classes are excluded");

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -45,7 +45,9 @@ namespace DeskPill
         DesktopNotification currentNotification;
         bool notificationLaunching;
         DictationController dictation;
-        bool gameModeActive,gamePolling;uint gamePid;
+        bool gameModeActive,gameDetected,gamePolling;uint gamePid;
+        DictationView dictationView;
+        Forms.ToolStripMenuItem gameModeItem;
         PresentMonCapture gameCapture;
         internal bool RuntimeProbeMode { get; set; }
         Border notificationCard;
@@ -430,7 +432,7 @@ namespace DeskPill
                     return;
                 }
 
-                if(!preview && state.Settings.GameOverlay)await PollGameMode();
+                if(!preview)await PollGameMode();
                 if (!preview) {dictation=new DictationController(this,state.Settings,Notify,delegate {if(pose==NotchPose.NotificationPeek)DismissNotification();SetOpen(false);});dictation.Configure();}
                 SetupTray();
                 lastVolume = SystemService.GetVolume();
@@ -587,7 +589,11 @@ namespace DeskPill
             {
                 Dispatcher.BeginInvoke(new Action(StartOcr));
             });
-            menu.Items.Add("Dictation (Win+Space, optional)", null, delegate { Dispatcher.BeginInvoke(new Action(delegate {if(dictation!=null)dictation.Toggle();})); });
+            gameModeItem=new Forms.ToolStripMenuItem("Game mode · glass & FPS") {Checked=state.Settings.GameOverlay};
+            gameModeItem.Click += delegate {Dispatcher.BeginInvoke(new Action(ToggleGameMode));};
+            menu.Opening += delegate {gameModeItem.Checked=state.Settings.GameOverlay;};
+            menu.Items.Add(gameModeItem);
+            menu.Items.Add("Dictation (hold Win+Space, optional)", null, delegate { Dispatcher.BeginInvoke(new Action(delegate {if(dictation!=null)dictation.Toggle();})); });
             menu.Items.Add("Clipboard palette", null, delegate { Dispatcher.BeginInvoke(new Action(ShowClipboardPalette)); });
             menu.Items.Add("Recent notifications", null, delegate { Dispatcher.BeginInvoke(new Action(ShowRecentNotifications)); });
             menu.Items.Add("Exit DeskPill", null, delegate
@@ -636,6 +642,10 @@ namespace DeskPill
             AddMenu(menu, "Clipboard palette    Ctrl+Alt+V", ShowClipboardPalette);
             AddMenu(menu, "Recent notifications", ShowRecentNotifications);
             AddMenu(menu, "Notification access…", async delegate { await RequestNotificationAccess(); });
+            var gameItem=new MenuItem {Header="Game mode · glass & FPS",IsCheckable=true,IsChecked=state.Settings.GameOverlay};
+            gameItem.Click += delegate {ToggleGameMode();};
+            menu.Opened += delegate {gameItem.IsChecked=state.Settings.GameOverlay;};
+            menu.Items.Add(gameItem);
             AddMenu(menu, "Settings…", ShowSettings);
             AddMenu(menu, "Pin open / unpin", delegate
             {
@@ -708,7 +718,7 @@ namespace DeskPill
 
         NotchPose RestingClosedPose()
         {
-            return !gameModeActive && (state.Settings.MinimalNotch || tabOverlapping) ? NotchPose.Tiny : NotchPose.Compact;
+            return !gameModeActive && (gameDetected || state.Settings.MinimalNotch || tabOverlapping) ? NotchPose.Tiny : NotchPose.Compact;
         }
 
         void TargetDimensions(NotchPose targetPose, out double w, out double h, out bool showDock, out bool showHud)
@@ -721,6 +731,11 @@ namespace DeskPill
                 w = IslandMotion.TinyWidth;
                 h = IslandMotion.TinyHeight;
                 showDock = false;
+            }
+            else if (targetPose == NotchPose.Dictation)
+            {
+                w = 372; h = dictationView == null ? 84 : dictationView.Height + 14;
+                showDock = false; showHud = true;
             }
             else if (targetPose == NotchPose.NotificationPeek)
             {
@@ -840,6 +855,7 @@ namespace DeskPill
                 Canvas.SetTop(hudCard, yOff + 2.0);
             if (notificationCard != null)
                 Canvas.SetTop(notificationCard, yOff + 6.0);
+            if (dictationView != null) Canvas.SetTop(dictationView, yOff + 7);
             if (headerRow != null)
                 Canvas.SetTop(headerRow, yOff + 18.0);
             Canvas.SetTop(pageViewport, yOff + PageTopY);
@@ -858,7 +874,7 @@ namespace DeskPill
         bool overlapPolling;
         async void PollTabOverlap()
         {
-            if (gameModeActive || capture || preview || SuppressCursorWatch || !IsLoaded || !IsVisible || overlapPolling)
+            if (gameDetected || (dictation!=null && dictation.Active) || capture || preview || SuppressCursorWatch || !IsLoaded || !IsVisible || overlapPolling)
                 return;
 
             bool detected = false;
@@ -876,7 +892,7 @@ namespace DeskPill
                 }
                 catch { return; }
                 finally { overlapPolling = false; }
-                if (!IsLoaded || !state.Settings.AutoShrinkOnTabs) return;
+                if (!IsLoaded || !state.Settings.AutoShrinkOnTabs || gameDetected || pose == NotchPose.Dictation || (dictation!=null && dictation.Active)) return;
             }
 
             if (detected)
@@ -885,7 +901,7 @@ namespace DeskPill
                 if (!tabOverlapping)
                 {
                     tabOverlapping = true;
-                    if (!open && pose != NotchPose.HudPill && pose != NotchPose.NotificationPeek)
+                    if (!open && pose != NotchPose.HudPill && pose != NotchPose.NotificationPeek && pose != NotchPose.Dictation)
                         SetPose(RestingClosedPose());
                 }
             }
@@ -895,7 +911,7 @@ namespace DeskPill
                 if (tabClearTicks >= 2)
                 {
                     tabOverlapping = false;
-                    if (!open && pose != NotchPose.HudPill && pose != NotchPose.NotificationPeek)
+                    if (!open && pose != NotchPose.HudPill && pose != NotchPose.NotificationPeek && pose != NotchPose.Dictation)
                         SetPose(RestingClosedPose());
                 }
             }
@@ -905,7 +921,7 @@ namespace DeskPill
         {
             tabOverlapping = overlapping;
             tabClearTicks = 0;
-            if (!open && pose != NotchPose.HudPill && pose != NotchPose.NotificationPeek)
+            if (!open && pose != NotchPose.HudPill && pose != NotchPose.NotificationPeek && pose != NotchPose.Dictation)
                 SetPose(RestingClosedPose());
         }
 
@@ -966,7 +982,7 @@ namespace DeskPill
 
         void ProcessPointer(double x, double y, DateTime now)
         {
-            if(gameModeActive || (dictation!=null && dictation.Active))return;
+            if(gameDetected || (dictation!=null && dictation.Active))return;
             bool inside = PointerBounds(open ? 12.0 : 0.0).Contains(x, y);
             if (pose == NotchPose.NotificationPeek)
             {
@@ -1052,8 +1068,9 @@ namespace DeskPill
 
             double hudRev = motion.HudReveal;
             hudLayer.Opacity = hudRev;
-            hudLayer.IsHitTestVisible = !open && (pose == NotchPose.HudPill || pose == NotchPose.NotificationPeek) && hudRev > 0.35;
-            hudCard.Visibility = pose == NotchPose.NotificationPeek ? Visibility.Collapsed : Visibility.Visible;
+            hudLayer.IsHitTestVisible = !open && (pose == NotchPose.HudPill || pose == NotchPose.NotificationPeek || pose == NotchPose.Dictation) && hudRev > 0.35;
+            hudCard.Visibility = (pose == NotchPose.NotificationPeek || pose == NotchPose.Dictation) ? Visibility.Collapsed : Visibility.Visible;
+            if (dictationView != null) dictationView.Visibility = pose == NotchPose.Dictation ? Visibility.Visible : Visibility.Collapsed;
             if (notificationCard != null) notificationCard.Visibility = pose == NotchPose.NotificationPeek ? Visibility.Visible : Visibility.Collapsed;
             hudTranslate.Y = (1.0 - hudRev) * -6.0;
             if (hudBar != null && hudRollsPercent)
@@ -1071,7 +1088,7 @@ namespace DeskPill
             }
 
             double expandedRev = motion.ExpandedReveal;
-            expandedLayer.Opacity = expandedRev;
+            expandedLayer.Opacity = pose == NotchPose.Dictation ? 0 : expandedRev;
             expandedLayer.IsHitTestVisible = open && expandedRev > 0.35;
             double es = motion.ExpandedScale;
             expandedScale.ScaleX = es;
@@ -1138,7 +1155,7 @@ namespace DeskPill
 
         static bool IsClosedPose(NotchPose p)
         {
-            return p == NotchPose.Tiny || p == NotchPose.Compact || p == NotchPose.HudPill || p == NotchPose.NotificationPeek;
+            return p == NotchPose.Tiny || p == NotchPose.Compact || p == NotchPose.HudPill || p == NotchPose.NotificationPeek || p == NotchPose.Dictation;
         }
 
         void SetPose(NotchPose next)
@@ -1182,7 +1199,8 @@ namespace DeskPill
 
         void SetOpen(bool value)
         {
-            if(value && gameModeActive){SetGameMode(new GameWindow());if(!IsVisible && IsLoaded)Show();}
+            if(value && dictation!=null && dictation.Active)dictation.Cancel();
+            if(value && gameDetected){SetGameMode(new GameWindow());if(!IsVisible && IsLoaded)Show();}
             if (open == value)
             {
                 if (value && IsLoaded && !IsVisible)
@@ -1418,7 +1436,7 @@ namespace DeskPill
             if (pose == NotchPose.NotificationPeek) return;
             double clamped = Math.Max(0.0, Math.Min(1.0, targetRatio));
             string finalText = string.IsNullOrEmpty(suffix) ? "" : ((int)Math.Round(clamped * 100.0)) + suffix;
-            if (gameModeActive)return;
+            if (gameDetected || (dictation!=null && dictation.Active))return;
             if (!state.Settings.ShowHudPopups || open || dragHovering)
             {
                 if (open)
@@ -1455,7 +1473,7 @@ namespace DeskPill
             if (hudIcon == null)
                 return;
             if (pose == NotchPose.NotificationPeek) return;
-            if (gameModeActive)return;
+            if (gameDetected || (dictation!=null && dictation.Active))return;
             if (!state.Settings.ShowHudPopups || open || dragHovering)
             {
                 if (open)
@@ -1522,7 +1540,7 @@ namespace DeskPill
                 if (state.Settings.FullscreenNotifications == "History only") notificationHistory.ClearPending();
                 return;
             }
-            if (gameModeActive || open || dragHovering || contextMenuOpen || !IsVisible || pose == NotchPose.NotificationPeek || clipboardPalette != null || historyWindow != null || settingsWindow != null || (dictation!=null && dictation.Active) || notificationLaunching) return;
+            if (gameDetected || open || dragHovering || contextMenuOpen || !IsVisible || pose == NotchPose.NotificationPeek || clipboardPalette != null || historyWindow != null || settingsWindow != null || (dictation!=null && dictation.Active) || notificationLaunching) return;
             var next = notificationHistory.Take(state.Settings,focus.Running && focus.Phase == "Focus");
             if (next != null) ShowNotification(next);
         }
@@ -3155,7 +3173,7 @@ namespace DeskPill
                 await RefreshMedia();
             if (ticks % 3 == 0)
             {
-                bool hide = !gameModeActive && state.Settings.HideFullscreen && !preview && NativeMethods.IsForegroundFullscreen(hwnd);
+                bool hide = !gameDetected && !(dictation!=null && dictation.Active) && state.Settings.HideFullscreen && !preview && NativeMethods.IsForegroundFullscreen(hwnd);
                 if (hide && IsVisible)
                     Hide();
                 else if (!hide && !IsVisible)
@@ -3306,33 +3324,125 @@ namespace DeskPill
             settingsWindow.Activate();
         }
 
+        internal void ShowDictation(DictationView view)
+        {
+            SetGameMode(new GameWindow());
+            hudTimer.Stop();
+            closeTimer.Stop();
+            hoverTimer.Stop();
+            if (pose == NotchPose.NotificationPeek)
+                DismissNotification();
+            SetOpen(false);
+            dictationView = view;
+            Canvas.SetLeft(view, (IslandMotion.CanvasWidth - view.Width) / 2);
+            Canvas.SetTop(view, motion.TopOffset + 7);
+            hudLayer.Children.Add(view);
+            view.SizeChanged += delegate
+            {
+                if (dictationView == view)
+                    SetPose(NotchPose.Dictation);
+            };
+            SetPose(NotchPose.Dictation);
+            if (!IsVisible && IsLoaded)
+                Show();
+        }
+
+        internal void HideDictation(DictationView view)
+        {
+            hudLayer.Children.Remove(view);
+            if (dictationView != view)
+                return;
+            dictationView = null;
+            if (!stopping && pose == NotchPose.Dictation)
+                SetPose(RestingClosedPose());
+        }
+
         async Task PollGameMode()
         {
-            if(capture||preview||gamePolling||settingsWindow!=null||IsInlinePose(pose))return;
-            if(!state.Settings.GameOverlay){if(gameModeActive)SetGameMode(new GameWindow());return;}
-            gamePolling=true;
-            try{var snapshot=await Task.Run(()=>GameWindow.Read(state.Settings));if(!stopping && state.Settings.GameOverlay && settingsWindow==null && snapshot.ProcessId==GameWindow.ForegroundPid)SetGameMode(snapshot);}
-            finally{gamePolling=false;}
+            if (capture || preview || gamePolling || settingsWindow != null || IsInlinePose(pose) || (dictation != null && dictation.Active))
+                return;
+            gamePolling = true;
+            try
+            {
+                var snapshot = await Task.Run(() => GameWindow.Read(state.Settings));
+                if (!stopping && settingsWindow == null && (dictation == null || !dictation.Active) && snapshot.ProcessId == GameWindow.ForegroundPid)
+                    SetGameMode(snapshot);
+            }
+            finally
+            {
+                gamePolling = false;
+            }
         }
+
+        void ToggleGameMode()
+        {
+            state.Settings.GameOverlay = !state.Settings.GameOverlay;
+            store.Save(state);
+            if (gameModeItem != null)
+                gameModeItem.Checked = state.Settings.GameOverlay;
+            if (gameDetected)
+                SetGameMode(new GameWindow { Matches = true, ProcessId = gamePid });
+            else
+            {
+                var pending = PollGameMode();
+            }
+        }
+
         void SetGameMode(GameWindow game)
         {
-            bool active=game.Matches;
-            if(active==gameModeActive && (!active||gamePid==game.ProcessId))return;
-            if(gameCapture!=null){gameCapture.Dispose();gameCapture=null;}
-            gameModeActive=active;gamePid=active?game.ProcessId:0;
-            NativeMethods.SetClickThrough(hwnd,active);
-            if(active)
+            bool detected = game.Matches, active = detected && state.Settings.GameOverlay;
+            if (detected == gameDetected && active == gameModeActive && (!detected || gamePid == game.ProcessId))
+                return;
+            if (gameCapture != null)
             {
-                tabOverlapping=false;hudTimer.Stop();currentNotification=null;
-                if(notificationCard!=null){hudLayer.Children.Remove(notificationCard);notificationCard=null;}
-                SetOpen(false);pose=NotchPose.Compact;
-                Themes.ConfigureCustom(state.Settings);ApplyTheme("Glass");
-                if(!capture&&!preview)gameCapture=new PresentMonCapture(game.ProcessId);
-                if(!IsVisible && IsLoaded)Show();
+                gameCapture.Dispose();
+                gameCapture = null;
             }
-            else ApplyTheme();
-            Place();SnapPoseImmediate();UpdateValues();
-            if(!active && !capture && !preview && state.Settings.HideFullscreen && NativeMethods.IsForegroundFullscreen(hwnd) && IsVisible)Hide();
+
+            gameDetected = detected;
+            gameModeActive = active;
+            gamePid = detected ? game.ProcessId : 0;
+            NativeMethods.SetClickThrough(hwnd, detected);
+            if (detected)
+            {
+                tabOverlapping = false;
+                hudTimer.Stop();
+                closeTimer.Stop();
+                hoverTimer.Stop();
+                currentNotification = null;
+                if (notificationCard != null)
+                {
+                    hudLayer.Children.Remove(notificationCard);
+                    notificationCard = null;
+                }
+
+                SetOpen(false);
+                pose = active ? NotchPose.Compact : NotchPose.Tiny;
+                if (active)
+                {
+                    Themes.ConfigureCustom(state.Settings);
+                    Themes.ConfigureGameGlass();
+                    ApplyTheme("Glass");
+                    if (!capture && !preview)
+                        gameCapture = new PresentMonCapture(game.ProcessId);
+                }
+                else
+                    ApplyTheme();
+                if (!IsVisible && IsLoaded)
+                    Show();
+            }
+            else
+            {
+                ApplyTheme();
+                if (!open)
+                    pose = RestingClosedPose();
+            }
+
+            Place();
+            SnapPoseImmediate();
+            UpdateValues();
+            if (!detected && !capture && !preview && state.Settings.HideFullscreen && NativeMethods.IsForegroundFullscreen(hwnd) && IsVisible && (dictation == null || !dictation.Active))
+                Hide();
         }
 
         async void PreviewPreferences(Settings settings, bool demonstrate)

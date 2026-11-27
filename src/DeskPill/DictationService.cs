@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -37,27 +37,66 @@ namespace DeskPill
         }
     }
 
+    public static class DictationInsertion
+    {
+        // Keep the result cancellable and visible until SendInput can safely use Ctrl+V.
+        public static async Task<bool> WaitForReleaseAsync(Func<bool> held, Func<bool> sourceCurrent, Action waiting, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            bool shown = false;
+            while (held())
+            {
+                token.ThrowIfCancellationRequested();
+                if (!sourceCurrent())
+                    return false;
+                if (!shown)
+                {
+                    waiting();
+                    shown = true;
+                }
+
+                await Task.Delay(25, token);
+            }
+
+            token.ThrowIfCancellationRequested();
+            return sourceCurrent();
+        }
+    }
+
     public sealed class DictationShortcutGate
     {
-        bool held;
+        bool held, recording, spaceDown;
         public bool ToggleRequested { get; private set; }
+        public bool FinishRequested { get; private set; }
 
         public bool Process(int key, bool down, bool windows, bool otherModifiers)
         {
-            ToggleRequested = false;
+            ToggleRequested = FinishRequested = false;
+            if (!down && (key == 0x5B || key == 0x5C) && recording)
+            {
+                recording = false;
+                FinishRequested = true;
+            }
+
             if (key != 0x20)
                 return false;
-            if (!down && held)
+            bool repeated = spaceDown && down;
+            spaceDown = down;
+            if (held)
             {
-                held = false;
+                if (!down)
+                {
+                    held = false;
+                    FinishRequested = recording;
+                    recording = false;
+                }
+
                 return true;
             }
 
-            if (down && held)
-                return true;
-            if (!down || !windows || otherModifiers)
+            if (!down || repeated || !windows || otherModifiers)
                 return false;
-            held = true;
+            held = recording = true;
             ToggleRequested = true;
             return true;
         }

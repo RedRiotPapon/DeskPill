@@ -13,6 +13,7 @@ namespace DeskPill
         Compact,
         HudPill,
         NotificationPeek,
+        Dictation,
         Expanded,
         OptionsDock,
         DropTarget,
@@ -165,7 +166,7 @@ namespace DeskPill
             dockVel = 0;
             hudPos = hudTarget = showHud ? 1.0 : 0.0;
             hudVel = 0;
-            contentPos = contentTarget = height >= ExpandedHeight ? 1.0 : 0.0;
+            contentPos = contentTarget = !showHud && height >= ExpandedHeight ? 1.0 : 0.0;
             contentVel = 0;
             pageSlideX = pageSlideVel = 0;
             IsAnimating = false;
@@ -234,7 +235,7 @@ namespace DeskPill
             targetH = height;
             dockTarget = showDock ? 1.0 : 0.0;
             hudTarget = showHud ? 1.0 : 0.0;
-            contentTarget = height >= ExpandedHeight ? 1.0 : 0.0;
+            contentTarget = !showHud && height >= ExpandedHeight ? 1.0 : 0.0;
 
             if (immediate)
             {
