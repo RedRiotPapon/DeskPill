@@ -44,6 +44,9 @@ class InteractionTests {
   Test("Regular users never initialize agent services from housekeeping",delegate {
    var w=Island();try{Call(w,"TrackAgentContext");Call(w,"ObserveAgentTransitions");Check(Field(w,"agentHub")==null&&Field(w,"agentScreenTarget")==null&&Field(w,"agentSpeech")==null,"Agent housekeeping activated without a connection");}finally{Call(w,"Cleanup");}
   });
+  Test("Agents page clearly labels experimental status and screen sharing",delegate {
+   var w=Island();try{Call(w,"SelectPage","Agents");Check(Controls<TextBlock>(w).Any(t=>t.Text.Contains("Experimental")),"Empty Agents page lacks experimental label");var state=(AppState)Field(w,"state");var p=new AgentProfile();state.Agents.Add(p);Call(w,"RebuildCurrentPage",true);Check(((TextBlock)Field(w,"agentPageStatus")).Text.Contains("Experimental"),"Connected Agents lacks experimental label");Call(w,"ShowAgentConversation",p.Id);Check(((TextBox)Field(w,"agentResult")).Text.Contains("camera"),"Screen questions lack explicit attachment guidance");}finally{Call(w,"Cleanup");}
+  });
   Test("Connected Agents offers direct prompt and voice entry",delegate {
    var w=Island();try{var state=(AppState)Field(w,"state");state.Agents.Add(new AgentProfile{Name="My project"});Call(w,"SelectPage","Agents");Check(Controls<Button>(w).Any(b=>Convert.ToString(b.Content)=="Ask your agent…")&&Controls<Button>(w).Any(b=>Convert.ToString(b.ToolTip)=="Dictate a prompt"),"Agent home still requires navigating to a separate open-conversation action");}finally{Call(w,"Cleanup");}
   });

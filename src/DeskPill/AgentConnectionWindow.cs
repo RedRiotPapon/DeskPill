@@ -28,7 +28,7 @@ namespace DeskPill
             WindowStartupLocation=WindowStartupLocation.CenterScreen;
             Background=Ui.Hex("#000000");Foreground=Ui.White;
             var body=new StackPanel{Margin=new Thickness(24,20,24,20)};
-            var title=Ui.Text(existing==null?"Bring your agent closer":"Your connection",23,Ui.White);title.FontWeight=FontWeights.SemiBold;body.Children.Add(title);
+            var title=Ui.Text(existing==null?"Agents Home · Experimental":"Experimental connection",23,Ui.White);title.FontWeight=FontWeights.SemiBold;body.Children.Add(title);
             description=Ui.Text("",12,Ui.Muted);description.TextWrapping=TextWrapping.Wrap;description.Margin=new Thickness(0,8,0,12);body.Children.Add(description);
             provider=AgentControls.Picker();provider.ItemsSource=new[]{"Codex CLI","Claude Code","Gemini CLI","App shortcut"};provider.SelectedItem=existing==null?"Codex CLI":existing.Provider;provider.Height=32;
             Add(body,"Connection type",provider);

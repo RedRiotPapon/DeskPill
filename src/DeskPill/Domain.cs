@@ -361,9 +361,12 @@ namespace DeskPill
         public string DirectoryPath, LastError = "";
         readonly object gate = new object ();
         bool recoveryBlocked;
-        public StateStore(string directory)
+        readonly bool readOnly;
+        public bool RecoveryBlocked { get { lock(gate)return recoveryBlocked; } }
+        public StateStore(string directory) : this(directory,false) {}
+        public StateStore(string directory,bool readOnly)
         {
-            DirectoryPath = Path.GetFullPath(directory);
+            DirectoryPath = Path.GetFullPath(directory);this.readOnly=readOnly;
         }
 
         public AppState Load()
@@ -376,23 +379,18 @@ namespace DeskPill
                 try
                 {
                     if (!File.Exists(path))
+                    {
+                        if(File.Exists(path+".bak")){LastError="Saved state was missing; loaded the last-good backup.";return ReadState(path+".bak");}
                         return Fresh();
-                    if (new FileInfo(path).Length > 8 * 1024 * 1024)
-                        throw new InvalidDataException("State exceeds size limit.");
-                    AppState a;
-                    using (var f = File.OpenRead(path))
-                        a = (AppState)new DataContractJsonSerializer(typeof(AppState)).ReadObject(f);
-                    if (a == null)
-                        throw new InvalidDataException("Empty state.");
-                    a.Normalize(DateTime.Now);
-                    return a;
+                    }
+                    return ReadState(path);
                 }
                 catch (Exception e)
                 {
                     LastError = e.Message;
                     try
                     {
-                        if (File.Exists(path))
+                        if (!readOnly && File.Exists(path))
                             File.Move(path, path + ".corrupt-" + DateTime.UtcNow.ToString("yyyyMMddHHmmssfff") + "-" + Guid.NewGuid().ToString("N"));
                     }
                     catch (Exception preserve)
@@ -401,9 +399,18 @@ namespace DeskPill
                         LastError += " Recovery: " + preserve.Message;
                     }
 
+                    try{if(File.Exists(path+".bak")){var backup=ReadState(path+".bak");LastError+=" Loaded the last-good backup.";return backup;}}
+                    catch(Exception backupError){LastError+=" Backup: "+backupError.Message;}
                     return Fresh();
                 }
             }
+        }
+
+        static AppState ReadState(string path)
+        {
+            if(new FileInfo(path).Length>8*1024*1024)throw new InvalidDataException("State exceeds size limit.");
+            AppState value;using(var file=File.OpenRead(path))value=(AppState)new DataContractJsonSerializer(typeof(AppState)).ReadObject(file);
+            if(value==null)throw new InvalidDataException("Empty state.");value.Normalize(DateTime.Now);return value;
         }
 
         static AppState Fresh()
@@ -417,6 +424,7 @@ namespace DeskPill
         {
             if (state == null)
                 throw new ArgumentNullException("state");
+            if(readOnly)return;
             lock (gate)
             {
                 if (recoveryBlocked)
@@ -446,7 +454,16 @@ namespace DeskPill
                     }
 
                     if (File.Exists(path))
-                        File.Replace(temp, path, null);
+                    {
+                        // Keep preferences and connections recoverable without retaining clipboard history in backups.
+                        var previous=ReadState(path);previous.Clipboard.Clear();
+                        string backup=path+".bak",backupTemp=temp+".bak";
+                        try{
+                            using(var f=new FileStream(backupTemp,FileMode.CreateNew,FileAccess.Write,FileShare.None)){serializer.WriteObject(f,previous);f.Flush(true);}
+                            if(File.Exists(backup))File.Replace(backupTemp,backup,null);else File.Move(backupTemp,backup);
+                            File.Replace(temp,path,null);
+                        }finally{if(File.Exists(backupTemp))File.Delete(backupTemp);}
+                    }
                     else
                         File.Move(temp, path);
                 }

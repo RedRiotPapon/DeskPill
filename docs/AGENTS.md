@@ -1,5 +1,5 @@
 ﻿
-# Agent connections
+# Agent connections · Experimental
 
 Agents Home runs a new, owned CLI session per connection and resumes only the UUID returned by that same connection during the current DeskPill lifetime. Changing its provider, executable, workspace or edit setting starts a fresh session. It does not inspect other app, IDE, cloud or CLI conversations.
 
@@ -24,3 +24,5 @@ Implementation references, checked 2026-11-27 against installed Codex and Claude
 - [Gemini configuration reference](https://geminicli.com/docs/reference/configuration/)
 
 Run `powershell -NoProfile -ExecutionPolicy Bypass -File tests/agents.ps1` for isolated fixture checks. The suite compiles into its own temporary folder, never calls a real provider and does not write into a user's workspace.
+
+For screen questions, use the camera button to select and review an image, then Send it with your question. Window enumeration is not screen capture. An agent reporting that its own computer-use capture is blocked does not mean it received a DeskPill image. DeskPill identifies attached images as the visual context so the tool can analyze them directly; it does not relax capture permissions or enable a live desktop-control loop. Provider vision behavior remains subject to its installed model and CLI.

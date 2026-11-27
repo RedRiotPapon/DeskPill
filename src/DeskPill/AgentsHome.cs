@@ -57,7 +57,7 @@ namespace DeskPill
         {
             if(state.Agents.Count==0)
             {
-                var welcome=Ui.Text("Your agents, close at hand",16,Ui.White);welcome.FontWeight=FontWeights.SemiBold;Put(target,welcome,32,6);
+                var welcome=Ui.Text("Agents Home · Experimental",16,Ui.White);welcome.FontWeight=FontWeights.SemiBold;Put(target,welcome,32,6);
                 var note=Ui.Text("Choose a tool and project. Stay in the flow.",11.5,Ui.Muted);note.Width=320;Put(target,note,32,34);
                 Put(target,Ui.Button("Connect agent",delegate{EditAgentConnection(null);}),32,68);
                 var hide=Ui.Button("Hide this page",HideAgentsPage);hide.Background=Brushes.Transparent;Put(target,hide,168,68);
@@ -86,15 +86,15 @@ namespace DeskPill
             if(selected!=null && agentPageStatus!=null)
             {
                 var session=Agents.Get(selected.Id);
-                agentPageStatus.Text=AgentTools.IsShortcut(selected)?"App shortcut · manual handoff":session.Status+" · "+selected.Provider;
+                agentPageStatus.Text="Experimental · "+(AgentTools.IsShortcut(selected)?"App shortcut · manual handoff":session.Status+" · "+selected.Provider);
                 agentPageSummary.Text=session.Status=="Ready"||string.IsNullOrWhiteSpace(session.Summary)?ProjectName(selected.Workspace):session.Summary;
                 agentPageSummary.ToolTip=agentPageSummary.Text;
             }
             var detail=state.Agents.FirstOrDefault(a=>a.Id==agentDetailId);
             if(detail==null||pose!=NotchPose.InlineAgents||agentResult==null)return;
             var active=Agents.Get(detail.Id);
-            if(agentSpeech==null)agentDetailStatus.Text=(AgentTools.IsShortcut(detail)?"Manual handoff":active.Status)+" · "+(detail.AllowEdits?"Project edits allowed":"Review only")+" · "+ProjectName(detail.Workspace);
-            string output=active.Status=="Needs attention"?active.Summary+Environment.NewLine+active.Transcript:string.IsNullOrEmpty(active.Transcript)?(AgentTools.IsShortcut(detail)?"Write a prompt below. Copy it, then open your app to choose its destination.":"Ask about this project. Responses appear here; voice fills your draft for review."):active.Transcript;
+            if(agentSpeech==null)agentDetailStatus.Text="Experimental · "+(AgentTools.IsShortcut(detail)?"Manual handoff":active.Status)+" · "+(detail.AllowEdits?"Project edits allowed":"Review only")+" · "+ProjectName(detail.Workspace);
+            string output=active.Status=="Needs attention"?active.Summary+Environment.NewLine+active.Transcript:string.IsNullOrEmpty(active.Transcript)?(AgentTools.IsShortcut(detail)?"Write a prompt below. Copy it, then open your app to choose its destination.":"Ask about this project. For screen questions, use the camera to attach and review an image before Send. Screen access is not automatic."):active.Transcript;
             if(active.Diagnostics.Length==0)agentDiagnosticsShown=false;
             agentDetails.Visibility=active.Diagnostics.Length>0?Visibility.Visible:Visibility.Hidden;
             agentDetails.ToolTip=agentDiagnosticsShown?"Show agent response":"Show tool diagnostics";

@@ -49,11 +49,11 @@ Use **Recent notifications** in the tray or right-click menu to review arrivals.
 
 **Settings → Pages** lets you hide unused pages and reorder the rest. Keep at least one visible.
 
-## Agents Home · version 2
+## Agents Home · Experimental
 
 ![Agents Home conversation using isolated demo data](docs/images/agents-home.png)
 
-**Agents** is visible by default, including after upgrading. Use **Settings → Pages** to hide, restore or reorder it; hiding keeps your connections. Music and everyday tools work without setting up an agent.
+Agents Home is experimental. **Agents** is visible by default, including after upgrading. Use **Settings → Pages** to hide, restore or reorder it; hiding keeps your connections. Music and everyday tools work without setting up an agent.
 
 Choose **Connect agent**, name the connection, pick its installed tool and project folder, then choose **Ask your agent…** or the microphone. Codex CLI, Claude Code and Gemini CLI adapters run separate sessions owned by DeskPill. Follow up in the same session, switch destinations without losing drafts, and use **Stop** to end that run. The home page’s manage menu offers edit, remove and new conversation. A quiet dot on the compact notch shows working, unread or attention states while Agents is visible; game mode suppresses it.
 
@@ -108,7 +108,7 @@ You need Windows, .NET Framework 4.8 and Windows SDK metadata (`Windows.winmd`).
 ```powershell
 .\build.ps1            # Compile to bin/DeskPill.exe
 .\build.ps1 -Test      # Build and run all test suites
-.\package.ps1          # Create dist/DeskPill-2.1.0-portable.zip
+.\package.ps1          # Create dist/DeskPill-2.1.1-portable.zip
 ```
 
 The solution is also available as `DeskPill.sln`. Full UI, media and OCR probes require an interactive Windows desktop; CI runs the deterministic suites. See [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -145,3 +145,5 @@ Bugs and focused pull requests are welcome. Include the Windows version, display
 [MIT License](LICENSE). Images use demo data generated from DeskPill itself.
 
 If DeskPill is useful to you, consider giving the repository a ⭐.
+
+Saved preferences and agent connections live in `%LOCALAPPDATA%\DeskPill\state.json`. Saves retain a last-good `state.json.bak` for recovery; this backup excludes clipboard history. Preview/capture modes read settings without writing to the normal profile. Conversation messages and drafts remain in memory.

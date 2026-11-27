@@ -7,7 +7,7 @@ using System.Reflection;
 
 [assembly: AssemblyTitle("DeskPill")]
 [assembly: AssemblyDescription("A living notch for Windows")]
-[assembly: AssemblyVersion("2.1.0.0")]
+[assembly: AssemblyVersion("2.1.1.0")]
 namespace DeskPill
 {
     public static class Program
@@ -35,8 +35,9 @@ namespace DeskPill
                 };
                 Ui.Init(app);
                 var directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DeskPill");
-                var store = new StateStore(directory);
+                var store = new StateStore(directory,preview || capture);
                 var state = store.Load();
+                if(store.RecoveryBlocked)throw new IOException("Your saved profile could not be read safely. Close other DeskPill instances or resolve file access, then restart. Your original state file has not been replaced.\n\n"+store.LastError);
                 var window = new IslandWindow(state, store, preview, capture);
                 app.MainWindow = window;
                 app.DispatcherUnhandledException += delegate (object sender, DispatcherUnhandledExceptionEventArgs e)

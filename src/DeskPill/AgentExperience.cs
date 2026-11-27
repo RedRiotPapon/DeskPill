@@ -109,7 +109,7 @@ namespace DeskPill
         void RefreshAgentAttachmentChip()
         {
             var p=state.Agents.FirstOrDefault(a=>a.Id==agentDetailId);if(p==null)return;
-            if(agentCaptureButton!=null){agentCaptureButton.IsEnabled=AgentTools.SupportsImages(p.Provider)&&!Agents.Get(p.Id).Running&&!agentCapturing&&!AgentVoiceActive;agentCaptureButton.ToolTip=AgentTools.SupportsImages(p.Provider)?"Attach a screen image · review before Send":"Screen images are currently supported by Codex CLI";}
+            if(agentCaptureButton!=null){agentCaptureButton.IsEnabled=AgentTools.SupportsImages(p.Provider)&&!Agents.Get(p.Id).Running&&!agentCapturing&&!AgentVoiceActive;agentCaptureButton.ToolTip=AgentTools.SupportsImages(p.Provider)?"Share screen image · select, review, then Send":"Screen sharing requires Codex CLI · attach an image explicitly";}
             if(agentAttachmentChip==null)return;AgentAttachment image;
             if(!agentAttachments.TryGetValue(p.Id,out image)){agentAttachmentChip.Visibility=Visibility.Collapsed;return;}
             var row=new DockPanel();var remove=Ui.Button("×",delegate{ClearAgentAttachment(p.Id);RefreshAgentViews();});remove.ToolTip="Remove screen attachment";remove.MinHeight=20;remove.Padding=new Thickness(6,0,6,0);DockPanel.SetDock(remove,Dock.Right);row.Children.Add(remove);

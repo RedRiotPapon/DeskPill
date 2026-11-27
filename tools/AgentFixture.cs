@@ -10,7 +10,8 @@ class AgentFixture {
  if(prompt=="slow"){
  Console.WriteLine("{\"type\":\"item.started\",\"item\":{\"type\":\"command_execution\",\"command\":\"fixture checking files\"}}");
  Thread.Sleep(450);}
- if(prompt=="check-image"){
+ if(prompt.EndsWith("check-image",StringComparison.Ordinal)){
+ if(!prompt.Contains("Use the attached image"))return 7;
  bool found=false;for(int i=0;i<args.Length-1;i++)if(args[i]=="--image"&&System.IO.File.Exists(args[i+1]))found=true;
  if(!found)return 6;
  }

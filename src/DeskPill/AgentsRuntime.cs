@@ -197,7 +197,7 @@ namespace DeskPill
                 lock(gate){if(run.Cancelled)return;var launch=AgentLaunch.Resolve(p);child=OwnedAgentProcess.Start(launch.Executable,launch.PrefixArguments+AgentTools.BuildArguments(p,prompt,s.SessionId,images),p.Workspace);run.Process=child;}
                 var stdout=Task.Run(()=>Read(child.Output,s,p.Provider,false));
                 var stderr=Task.Run(()=>Read(child.Error,s,p.Provider,true));
-                var input=Task.Run(()=>{try{using(var writer=child.Input){if(p.Provider!="Gemini CLI")writer.Write(prompt);}}catch(IOException){}catch(ObjectDisposedException){}});
+                var input=Task.Run(()=>{try{using(var writer=child.Input){if(p.Provider!="Gemini CLI")writer.Write(images.Length==0?prompt:"DeskPill screen context: Use the attached image as the visual context for this request. It is a user-reviewed still image, not a live screen stream. Do not attempt another screen capture to read it. If a newer image is needed, ask the user to attach one with the camera button.\n\nUser request:\n"+prompt);}}catch(IOException){}catch(ObjectDisposedException){}});
                 bool finished=child.Wait(30*60*1000);
                 child.Stop(); // Also release pipes inherited by any remaining descendants.
                 Task.WaitAll(new[]{stdout,stderr,input},10000);
