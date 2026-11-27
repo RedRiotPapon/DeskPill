@@ -9,7 +9,7 @@ DeskPill is a small desktop notch that expands when you need it. Control your mu
 
 ## What it does
 
-- **Music:** real Windows media sessions, artwork, playback controls and seeking.
+- **Music:** real Windows media sessions, artwork, playback controls and seeking. Click the artwork or track title to open its source app or matching browser tab.
 - **Focus:** work/break timer with progress that survives restarts.
 - **Shelf:** drop files to keep shortcuts handy, then open, copy or drag them into another app.
 - **Tasks & water:** lightweight tasks and optional hydration tracking.
@@ -48,6 +48,12 @@ Use **Recent notifications** in the tray or right-click menu to review arrivals.
 
 **Settings → Pages** lets you hide unused pages and reorder the rest. Keep at least one visible.
 
+## Music shortcuts
+
+Click the **artwork or track title** to return to the playing app. Chrome, Edge, Brave, Vivaldi, Opera, Firefox and Chromium can select a matching accessible tab using the media title and artist. Tab selection needs a complete, unambiguous match; otherwise DeskPill brings the browser forward. It needs no browser extension or debugging port. [Matching details and limits](docs/MEDIA.md).
+
+The speaker button opens a continuous system-volume slider. Click along its track, drag, or use the arrow keys. It closes after 2.5 seconds without interaction, 450 ms after leaving, on an outside click or with Esc. Dragging keeps it open. Windows audio writes run in a shared background queue, preserving the final value when the flyout closes or reopens.
+
 ## Optional English dictation
 
 Open **Settings → Dictation**, install the speech pack (about 54 MB), enable dictation and save. Hold **Win+Space** while speaking, then release to transcribe and insert your words. **Esc** discards the recording. The notch itself shows the duration, an animated microphone and a waveform driven by actual microphone input; no listening window opens. If you switch apps, review stays inside the notch. The limit is 90 seconds.
@@ -79,7 +85,7 @@ You need Windows, .NET Framework 4.8 and Windows SDK metadata (`Windows.winmd`).
 ```powershell
 .\build.ps1            # Compile to bin/DeskPill.exe
 .\build.ps1 -Test      # Build and run all test suites
-.\package.ps1          # Create dist/DeskPill-1.4.0-portable.zip
+.\package.ps1          # Create dist/DeskPill-1.5.0-portable.zip
 ```
 
 The solution is also available as `DeskPill.sln`. Full UI, media and OCR probes require an interactive Windows desktop; CI runs the deterministic suites. See [CONTRIBUTING.md](CONTRIBUTING.md).

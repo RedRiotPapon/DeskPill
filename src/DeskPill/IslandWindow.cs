@@ -195,6 +195,9 @@ namespace DeskPill
         bool hudRollsPercent;
         string hudRollSuffix = "%";
         VolumeWatcher volumeWatcher;
+        VolumeFlyout volumeFlyout;
+        LatestVolumeWriter volumeWriter;
+        bool mediaOpening;
         Forms.NotifyIcon tray;
         HwndSource source;
         SettingsWindow settingsWindow;
@@ -279,6 +282,7 @@ namespace DeskPill
                     compactMascot.NudgeLook((e.GetPosition(compactLayer).X - IslandMotion.CanvasWidth * 0.5) / 86.0);
             };
             MouseLeave += delegate { PollHoverState(); };
+            IsVisibleChanged += delegate {if(!IsVisible)CloseVolumeMenu();};
             ContextMenuOpening += delegate
             {
                 contextMenuOpen = true;
@@ -316,6 +320,7 @@ namespace DeskPill
             {
                 if (e.Key == Key.Escape)
                 {
+                    if(volumeFlyout!=null && volumeFlyout.IsOpen){CloseVolumeMenu();e.Handled=true;return;}
                     if (pose == NotchPose.NotificationPeek) { DismissNotification(); e.Handled = true; return; }
                     if (IsInlinePose(pose))
                     {
@@ -521,7 +526,7 @@ namespace DeskPill
 
         bool CanAutoClose()
         {
-            if (pinned || contextMenuOpen || dragHovering)
+            if (pinned || contextMenuOpen || dragHovering || (volumeFlyout!=null && volumeFlyout.IsOpen))
                 return false;
             if (IsInlinePose(pose))
             {
@@ -1199,6 +1204,7 @@ namespace DeskPill
 
         void SetOpen(bool value)
         {
+            if(!value)CloseVolumeMenu();
             if(value && dictation!=null && dictation.Active)dictation.Cancel();
             if(value && gameDetected){SetGameMode(new GameWindow());if(!IsVisible && IsLoaded)Show();}
             if (open == value)
@@ -1407,6 +1413,7 @@ namespace DeskPill
 
         void HandleLiveVolume(float volume, bool muted)
         {
+            if(volumeFlyout!=null)volumeFlyout.Update(volume,muted);
             if (stopping || capture)
                 return;
             float prevVol = lastVolume;
@@ -1995,6 +2002,7 @@ namespace DeskPill
 
         void RebuildCurrentPage(bool preserveDock)
         {
+            CloseVolumeMenu();
             if (!Order().Contains(page)) page=Order()[0];
             if (currentPageVisual != null)
             {
@@ -2086,56 +2094,164 @@ namespace DeskPill
         void BuildMusic(Canvas target)
         {
             var current = media.Current;
-            var art = new Border { Width = 62, Height = 62, CornerRadius = new CornerRadius(16), Background = Ui.Card, ClipToBounds = true };
-            art.Child = current.Artwork != null ? (UIElement)new Image { Source = current.Artwork, Stretch = Stretch.UniformToFill }
-                : Ui.Icon("\uE8D6", 28, Ui.Hex("#555555"));
-            Put(target, art, 32, -16);
+            var art = new Border
+            {
+                Width = 62,
+                Height = 62,
+                CornerRadius = new CornerRadius(16),
+                Background = Ui.Card,
+                ClipToBounds = true
+            };
+            art.Child = current.Artwork != null ? (UIElement)new Image
+            {
+                Source = current.Artwork,
+                Stretch = Stretch.UniformToFill
+            }
+
+            : Ui.Icon("\uE8D6", 28, Ui.Hex("#555555"));
+            var header = new Canvas
+            {
+                Width = 332,
+                Height = 64
+            };
+            Put(header, art, 0, 0);
             var title = Ui.Text(current.HasMedia ? current.Title : "Not Playing", 14, Ui.White);
-            title.FontWeight = FontWeights.SemiBold; title.Width = 250;
-            Put(target, title, 110, 5);
+            title.FontWeight = FontWeights.SemiBold;
+            title.Width = 250;
+            Put(header, title, 78, 21);
             var artist = Ui.Text(current.HasMedia ? current.Artist : "Play music in a media app", 10, Ui.Muted);
-            artist.Width = 250; Put(target, artist, 110, 25);
-            mediaElapsed = Ui.Text("0:00", 15, Ui.White); mediaElapsed.Width = 48; Put(target, mediaElapsed, 32, 58);
-            mediaRemaining = Ui.Text("−0:00", 15, Ui.White); mediaRemaining.Width = 58; mediaRemaining.TextAlignment = TextAlignment.Right;
+            artist.Width = 250;
+            Put(header, artist, 78, 41);
+            var sourceAction = new Button
+            {
+                Content = header,
+                Width = 332,
+                Height = 64,
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand,
+                IsEnabled = current.HasMedia && !string.IsNullOrWhiteSpace(current.Source),
+                ToolTip = "Open playing app or browser tab",
+                Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Border x:Name='outline' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' Background='{TemplateBinding Background}' CornerRadius='12' BorderThickness='0' BorderBrush='{DynamicResource DeskPillAccent}'><ContentPresenter/></Border><ControlTemplate.Triggers><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='outline' Property='BorderThickness' Value='1'/></Trigger></ControlTemplate.Triggers></ControlTemplate>")
+            };
+            System.Windows.Automation.AutomationProperties.SetName(sourceAction, current.HasMedia ? "Open " + current.Title + " in its source app" : "No media source available");
+            sourceAction.Click += delegate
+            {
+                OpenMediaSource();
+            };
+            Put(target, sourceAction, 32, -16);
+            mediaElapsed = Ui.Text("0:00", 15, Ui.White);
+            mediaElapsed.Width = 48;
+            Put(target, mediaElapsed, 32, 58);
+            mediaRemaining = Ui.Text("−0:00", 15, Ui.White);
+            mediaRemaining.Width = 58;
+            mediaRemaining.TextAlignment = TextAlignment.Right;
             Put(target, mediaRemaining, 306, 58);
-            var bar = new ProgressBar { Width = 220, Height = 3, Maximum = 1, Foreground = Ui.White, Background = Ui.Hex("#424242"), BorderThickness = new Thickness(0), Cursor = Cursors.Hand };
-            mediaProgress = bar; Put(target, bar, 84, 65);
+            var bar = new ProgressBar
+            {
+                Width = 220,
+                Height = 3,
+                Maximum = 1,
+                Foreground = Ui.White,
+                Background = Ui.Hex("#424242"),
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand
+            };
+            mediaProgress = bar;
+            Put(target, bar, 84, 65);
             bar.MouseLeftButtonDown += async delegate (object sender, MouseButtonEventArgs e)
             {
-                if (media.Current.DurationSeconds <= 0) return;
-                try { await media.SeekAsync(Math.Max(0, Math.Min(1, e.GetPosition(bar).X / bar.ActualWidth)) * media.Current.DurationSeconds); UpdateValues(); }
-                catch (Exception ex) { ReportError(ex); }
+                if (media.Current.DurationSeconds <= 0)
+                    return;
+                try
+                {
+                    await media.SeekAsync(Math.Max(0, Math.Min(1, e.GetPosition(bar).X / bar.ActualWidth)) * media.Current.DurationSeconds);
+                    UpdateValues();
+                }
+                catch (Exception ex)
+                {
+                    ReportError(ex);
+                }
             };
-            var lyrics = Ui.IconButton("\uE8F2", "Lyrics", ShowInlineLyrics); lyrics.Background = Brushes.Transparent;
+            var lyrics = Ui.IconButton("\uE8F2", "Lyrics", ShowInlineLyrics);
+            lyrics.Background = Brushes.Transparent;
             Put(target, lyrics, 46, 82);
             Put(target, TransportButton("\uE892", "Previous track", media.PreviousAsync, 19), 132, 80);
             Put(target, TransportButton(current.Playing ? "\uE769" : "\uE768", "Play or pause", media.PlayPauseAsync, 21), 180, 80);
             Put(target, TransportButton("\uE893", "Next track", media.NextAsync, 19), 228, 80);
             Button volume = null;
-            volume = Ui.IconButton("\uE767", "Volume", delegate { OpenVolumeMenu(volume); });
+            volume = Ui.IconButton("\uE767", "Volume", delegate
+            {
+                OpenVolumeMenu(volume);
+            });
             volume.Background = Brushes.Transparent;
             Put(target, volume, 338, 82);
         }
 
+        async void OpenMediaSource()
+        {
+            if (mediaOpening)
+                return;
+            var current = media.Current;
+            if (!current.HasMedia || string.IsNullOrWhiteSpace(current.Source))
+                return;
+            mediaOpening = true;
+            CloseVolumeMenu();
+            pinned = false;
+            SetOpen(false);
+            try
+            {
+                var result = await MediaSourceLauncher.OpenAsync(current);
+                if (!result.Opened)
+                    Notify("Could not open the media source. Open it from the taskbar.");
+                else if (MediaSourcePolicy.IsBrowser(MediaSourcePolicy.Executable(current.Source)) && !result.TabSelected)
+                    Notify("Browser opened. The playing tab could not be identified uniquely.");
+            }
+            finally
+            {
+                mediaOpening = false;
+            }
+        }
+
+        void CloseVolumeMenu()
+        {
+            var flyout = volumeFlyout;
+            volumeFlyout = null;
+            if (flyout != null)
+                flyout.Dispose();
+        }
+
         void OpenVolumeMenu(Button anchor)
         {
+            if (stopping)
+                return;
+            if (volumeFlyout != null && volumeFlyout.IsOpen)
+            {
+                CloseVolumeMenu();
+                return;
+            }
+
             float current = SystemService.GetVolume();
-            if (current < 0) { Notify("Volume unavailable"); return; }
-            var slider = new Slider { Minimum = 0, Maximum = 100, Value = current * 100, Width = 160, Margin = new Thickness(8), ToolTip = "System volume" };
-            slider.ValueChanged += delegate
+            if (current < 0)
             {
-                try { SystemService.SetVolume((float)(slider.Value / 100)); }
-                catch (Exception ex) { ReportError(ex); }
-            };
-            var menu = new ContextMenu { PlacementTarget = anchor };
-            menu.Items.Add(new MenuItem { Header = slider, StaysOpenOnClick = true });
-            AddMenu(menu, "Mute / unmute", delegate
+                Notify("Volume unavailable");
+                return;
+            }
+
+            CloseVolumeMenu();
+            closeTimer.Stop();
+            VolumeFlyout flyout = null;
+            if (volumeWriter == null)
+                volumeWriter = new LatestVolumeWriter(SystemService.SetVolume);
+            flyout = new VolumeFlyout(current, SystemService.GetMuted(), volumeWriter, SystemService.ToggleMute, delegate
             {
-                try { SystemService.ToggleMute(); }
-                catch (Exception ex) { ReportError(ex); }
+                if (volumeFlyout == flyout)
+                    volumeFlyout = null;
+                if (!stopping && CanAutoClose() && !IsCursorInsideNotch(12))
+                    closeTimer.Start();
             });
-            anchor.ContextMenu = menu;
-            menu.IsOpen = true;
+            volumeFlyout = flyout;
+            flyout.Open(anchor);
         }
 
         async Task Transport(Func<Task> action)
@@ -3185,6 +3301,7 @@ namespace DeskPill
             }
 
             float volume = SystemService.GetVolume();
+            if(volumeFlyout!=null && volume>=0)volumeFlyout.Update(volume,SystemService.GetMuted());
             bool muted = SystemService.GetMuted();
             int battery = SystemService.BatteryPercent();
             int brightness = await Task.Run(() => SystemService.GetBrightness());
@@ -3591,6 +3708,8 @@ namespace DeskPill
 
         void Cleanup()
         {
+            CloseVolumeMenu();
+            if(volumeWriter!=null){volumeWriter.Dispose();volumeWriter=null;}
             if(gameCapture!=null){try{gameCapture.StopAsync().Wait(2000);}catch(AggregateException){}gameCapture=null;}
             NativeMethods.SetClickThrough(hwnd,false);
             if(dictation!=null){dictation.Dispose();dictation=null;}

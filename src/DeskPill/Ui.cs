@@ -171,6 +171,16 @@ namespace DeskPill
             };
         }
 
+        public static ControlTemplate SliderTemplate()
+        {
+            return (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='Slider'>
+<Grid Height='26' Margin='8,0'><Border Height='3' VerticalAlignment='Center' Background='{DynamicResource DeskPillTooltipLine}' CornerRadius='1.5'/><Track x:Name='PART_Track' Minimum='{TemplateBinding Minimum}' Maximum='{TemplateBinding Maximum}' Value='{Binding Value, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}' IsDirectionReversed='{TemplateBinding IsDirectionReversed}'>
+<Track.DecreaseRepeatButton><RepeatButton Command='{x:Static Slider.DecreaseLarge}' IsTabStop='False'><RepeatButton.Template><ControlTemplate TargetType='RepeatButton'><Border Height='3' VerticalAlignment='Center' Background='{DynamicResource DeskPillAccent}' CornerRadius='1.5'/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.DecreaseRepeatButton>
+<Track.Thumb><Thumb Width='14' Height='14' Cursor='Hand'><Thumb.Template><ControlTemplate TargetType='Thumb'><Border CornerRadius='7' Background='{DynamicResource DeskPillAccent}'/></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
+<Track.IncreaseRepeatButton><RepeatButton Command='{x:Static Slider.IncreaseLarge}' IsTabStop='False'><RepeatButton.Template><ControlTemplate TargetType='RepeatButton'><Border Background='Transparent'/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.IncreaseRepeatButton>
+</Track></Grid></ControlTemplate>");
+        }
+
         public static TextBox Input(string text)
         {
             return new TextBox

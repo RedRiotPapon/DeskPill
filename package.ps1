@@ -1,7 +1,7 @@
 param([switch]$SkipBuild)
 $ErrorActionPreference = 'Stop'
 if (!$SkipBuild) { & (Join-Path $PSScriptRoot 'build.ps1') }
-$releaseDirectory = Join-Path $PSScriptRoot 'dist/DeskPill-1.4.0'
+$releaseDirectory = Join-Path $PSScriptRoot 'dist/DeskPill-1.5.0'
 New-Item -ItemType Directory -Force -Path $releaseDirectory | Out-Null
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'bin/DeskPill.exe') -Destination $releaseDirectory -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'bin/DeskPill.Speech.exe') -Destination $releaseDirectory -Force
@@ -10,7 +10,7 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README.md') -Destination $relea
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'LICENSE') -Destination $releaseDirectory -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'docs/CAPABILITIES.md') -Destination (Join-Path $releaseDirectory 'CAPABILITIES.md') -Force
 @'
-DeskPill 1.4.0
+DeskPill 1.5.0
 
 Run DeskPill.exe. Hover over the top-center notch to expand it.
 Use dots/arrows or the mouse wheel to switch the five pages.
@@ -21,6 +21,8 @@ DeskPill.exe --preview
 Preview does not register global shortcuts or monitor the clipboard.
 
 Normal-mode shortcuts: Ctrl+Alt+Space (Ask), Ctrl+Alt+T (screen OCR), Ctrl+Alt+V (clipboard palette).
+Music: click artwork/title to open its app or a uniquely matched accessible browser tab.
+Volume: the speaker button opens a smooth timed flyout; Esc or an outside click dismisses it.
 Motion: Settings > Motion has hover timing, animation pace, live preview and reset.
 Glass: select the second theme in Appearance to control surface opacity and highlights.
 Gaming: right-click the tray icon > Game mode for the translucent FPS bar.
@@ -35,6 +37,6 @@ Startup registration is opt-in through Settings.
 Windows 10/11 and .NET Framework 4.8 are required. No installation is needed.
 See README.md and CAPABILITIES.md for usage and current limitations.
 '@ | Set-Content -LiteralPath (Join-Path $releaseDirectory 'START-HERE.txt') -Encoding UTF8
-$archive = Join-Path $PSScriptRoot 'dist/DeskPill-1.4.0-portable.zip'
+$archive = Join-Path $PSScriptRoot 'dist/DeskPill-1.5.0-portable.zip'
 Compress-Archive -Path (Join-Path $releaseDirectory '*') -DestinationPath $archive -Force
 Write-Host ('Packaged ' + $archive)

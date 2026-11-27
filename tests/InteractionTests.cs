@@ -33,8 +33,67 @@ class InteractionTests {
   var image=new RenderTargetBitmap(100,42,96,96,PixelFormats.Pbgra32);image.Render(element);var pixels=new byte[100*42*4];image.CopyPixels(pixels,400,0);
   int count=0;for(int i=3;i<pixels.Length;i+=4)if(pixels[i]>30)count++;return count;
  }
+ static void PumpUntil(Task task) {
+  var frame=new DispatcherFrame();var limit=new DispatcherTimer{Interval=TimeSpan.FromSeconds(4)};
+  limit.Tick+=delegate{frame.Continue=false;};limit.Start();
+  task.ContinueWith(t=>Application.Current.Dispatcher.BeginInvoke(new Action(delegate{frame.Continue=false;})));
+  Dispatcher.PushFrame(frame);limit.Stop();Check(task.IsCompleted,"Native UI Automation did not finish within its fixture deadline");task.GetAwaiter().GetResult();
+ }
  [STAThread] static int Main() {
   var app=new Application {ShutdownMode=ShutdownMode.OnExplicitShutdown};Ui.Init(app);
+  Test("Music source navigation has a dedicated clickable track control",delegate {
+   var w=Island();var service=(MediaService)Field(w,"media");service.Current=new MediaSnapshot {Source="chrome.exe",Title="An example song",Artist="An artist"};Call(w,"RebuildCurrentPage",true);
+   Check(Controls<Button>(w).Any(b=>Convert.ToString(b.ToolTip)=="Open playing app or browser tab"),"Track source has no keyboard-accessible action");Call(w,"Cleanup");
+  });
+  Test("Volume flyout uses a continuous slider and closes after idle",delegate {
+   var type=typeof(IslandWindow).Assembly.GetType("DeskPill.VolumeFlyout");Check(type!=null,"Volume still uses an untimed context menu");
+   int closed=0;var flyout=Activator.CreateInstance(type,new object[]{.5f,false,new Action<float>(delegate{}),new Action(delegate{}),new Action(()=>closed++)});
+   var root=(FrameworkElement)Field(flyout,"root");var slider=Controls<Slider>(root).Single();
+   Check(slider.IsMoveToPointEnabled && !slider.IsSnapToTickEnabled && slider.Template!=null,"Volume slider is not continuous and directly seekable");
+   type.GetField("opened",Private).SetValue(flyout,true);type.GetField("deadline",Private).SetValue(flyout,DateTime.UtcNow.AddSeconds(-1));Call(flyout,"OnIdle");
+   Check(closed==1,"Idle volume flyout did not dismiss");((IDisposable)flyout).Dispose();
+  });
+  Test("Volume dismissal pauses through dragging and external changes never write back",delegate {
+   var type=typeof(IslandWindow).Assembly.GetType("DeskPill.VolumeFlyout");int closed=0,writes=0;
+   var flyout=Activator.CreateInstance(type,new object[]{.5f,false,new Action<float>(v=>System.Threading.Interlocked.Increment(ref writes)),new Action(delegate{}),new Action(()=>closed++)});
+   type.GetField("opened",Private).SetValue(flyout,true);type.GetField("deadline",Private).SetValue(flyout,DateTime.UtcNow.AddSeconds(-1));type.GetField("dragging",Private).SetValue(flyout,true);Call(flyout,"OnIdle");Check(closed==0,"Flyout closed under an active drag");
+   var slider=Controls<Slider>((FrameworkElement)Field(flyout,"root")).Single();
+   type.GetMethod("Update").Invoke(flyout,new object[]{.2f,false});Check(Math.Abs(slider.Value-50)<.01,"A system callback pulled the thumb away from the pointer");
+   type.GetField("dragging",Private).SetValue(flyout,false);type.GetMethod("Update").Invoke(flyout,new object[]{.2f,false});Check(Math.Abs(slider.Value-20)<.01 && writes==0,"External volume did not sync cleanly or wrote a feedback loop");
+   Call(flyout,"OnIdle");Check(closed==1,"Flyout stayed open after the drag ended");((IDisposable)flyout).Dispose();
+  });
+  Test("Closing the notch dismisses its active volume flyout",delegate {
+   var w=Island();var type=typeof(IslandWindow).Assembly.GetType("DeskPill.VolumeFlyout");int closed=0;
+   var flyout=Activator.CreateInstance(type,new object[]{.5f,false,new Action<float>(delegate{}),new Action(delegate{}),new Action(()=>closed++)});type.GetField("opened",Private).SetValue(flyout,true);w.GetType().GetField("volumeFlyout",Private).SetValue(w,flyout);
+   Check(!(bool)typeof(IslandWindow).GetMethod("CanAutoClose",Private).Invoke(w,null),"Notch can close during volume interaction");
+   Call(w,"SetOpen",false);Check(closed==1 && Field(w,"volumeFlyout")==null,"Closing left an orphaned volume popup");Call(w,"Cleanup");
+  });
+  Test("Media tab lookup and selection work through native UI Automation on an isolated fixture",delegate {
+   var tabs=new TabControl();tabs.Items.Add(new TabItem{Header="Unrelated tab",Content="Other content"});tabs.Items.Add(new TabItem{Header="Example song — Example artist",Content="Media content"});tabs.SelectedIndex=0;
+   FrameworkElement chrome=tabs;for(int i=0;i<8;i++)chrome=new GroupBox{Content=chrome};
+   var window=new Window{Content=chrome,Width=360,Height=130,ShowInTaskbar=false,ShowActivated=false,Title="DeskPill media navigation fixture"};
+   try {
+    window.Show();window.UpdateLayout();var launcher=typeof(MediaSourceLauncher);var nativeType=launcher.GetNestedType("AppWindow",BindingFlags.NonPublic);var native=Activator.CreateInstance(nativeType,true);
+    nativeType.GetField("Handle").SetValue(native,new WindowInteropHelper(window).Handle);nativeType.GetField("Pid").SetValue(native,(uint)System.Diagnostics.Process.GetCurrentProcess().Id);
+    var tabType=launcher.GetNestedType("Tab",BindingFlags.NonPublic);var list=(System.Collections.IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(tabType));
+    var read=launcher.GetMethod("ReadTabs",BindingFlags.Static|BindingFlags.NonPublic);var cancel=new System.Threading.CancellationTokenSource(2500);
+    PumpUntil(Task.Run(delegate{Check((bool)read.Invoke(null,new object[]{native,list,cancel.Token}),"A complete tab scan was not reported");}));
+    var names=list.Cast<object>().Select(t=>(string)tabType.GetField("Name").GetValue(t)).ToArray();int best=MediaSourcePolicy.BestTab(new MediaSnapshot{Title="Example song",Artist="Example artist"},names);Check(best>=0,"Native browser-chrome traversal did not find the media tab");
+    var element=tabType.GetField("Element").GetValue(list[best]);var patternType=element.GetType().Assembly.GetType("System.Windows.Automation.SelectionItemPattern");
+    PumpUntil(Task.Run(delegate{var pattern=element.GetType().GetMethod("GetCurrentPattern").Invoke(element,new[]{patternType.GetField("Pattern").GetValue(null)});patternType.GetMethod("Select").Invoke(pattern,null);}));
+    Check(tabs.SelectedIndex==1,"Native selection did not activate the matching tab");
+    for(int i=0;i<165;i++)tabs.Items.Add(new TabItem{Header="Extra tab "+i});window.UpdateLayout();list.Clear();cancel=new System.Threading.CancellationTokenSource(3000);
+    PumpUntil(Task.Run(delegate{Check(!(bool)read.Invoke(null,new object[]{native,list,cancel.Token}),"A truncated tab scan was incorrectly reported as complete");}));
+   }finally{window.Close();}
+  });
+  Test("Reopening volume shares the same queue so stale writes cannot win",delegate {
+   var entered=new System.Threading.ManualResetEventSlim();var release=new System.Threading.ManualResetEventSlim();float last=-1;
+   var writer=new LatestVolumeWriter(v=>{entered.Set();release.Wait(2000);last=v;});var type=typeof(IslandWindow).Assembly.GetType("DeskPill.VolumeFlyout");Action empty=delegate{};
+   var first=Activator.CreateInstance(type,new object[]{.5f,false,writer,empty,empty});type.GetField("opened",Private).SetValue(first,true);var slider=Controls<Slider>((FrameworkElement)Field(first,"root")).Single();slider.Value=20;
+   Check(entered.Wait(1000),"Background audio fixture never started");slider.Value=40;((IDisposable)first).Dispose();
+   var second=Activator.CreateInstance(type,new object[]{.5f,false,writer,empty,empty});type.GetField("opened",Private).SetValue(second,true);Controls<Slider>((FrameworkElement)Field(second,"root")).Single().Value=80;((IDisposable)second).Dispose();
+   release.Set();writer.Completion.GetAwaiter().GetResult();Check(Math.Abs(last-.8f)<.001,"A previous flyout overwrote the newly requested volume");writer.Dispose();
+  });
   Test("Live Settings preview updates the island and cancels without resetting its content",delegate {
    var w=Island();var state=(AppState)Field(w,"state");var page=Field(w,"currentPageVisual");var focus=Field(w,"focus");
    Call(w,"ShowSettings");var settings=(SettingsWindow)Field(w,"settingsWindow");

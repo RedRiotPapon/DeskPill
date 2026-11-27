@@ -1,4 +1,4 @@
-# DeskPill 1.4
+# DeskPill 1.5
 
 Native Windows desktop notch with Music, Shelf, Focus, Water and Tasks. Hide unused pages without deleting their data. Classic, Glass, seven colored skins and a Custom palette support live preview.
 
@@ -13,3 +13,5 @@ Optional English dictation is built into DeskPill: one-time verified speech-pack
 Settings → Motion provides opening/options delays, closing grace and spring pace with live preview, reset and cancellation. Glass appears directly after Classic, with opacity and highlight controls. It uses tinted translucency without a backdrop blur.
 
 Game mode is available from the tray right-click menu and switches temporarily to compact, input-transparent Glass at 22% shell opacity while the foreground game matches a saved executable or fullscreen graphics heuristic. FPS is measured from PresentMon presentation intervals. Windows trace access is required; the current non-elevated test session verified the unavailable state, not live game FPS. With Game mode off, matching games tuck the notch into its tiny state without FPS capture. The saved theme and pointer behavior restore on game exit.
+
+Music artwork/title opens its source app or a uniquely matched accessible browser tab. Chrome, Edge, Brave, Vivaldi, Opera, Firefox and Chromium source IDs are handled; live matching was checked read-only in Chrome. Volume uses a continuous, timed flyout with background audio writes and ordered mute actions. See [music behavior and limits](MEDIA.md).

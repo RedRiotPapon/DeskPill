@@ -103,7 +103,13 @@ namespace DeskPill
             return window != IntPtr.Zero && expected != 0 && expected == actual && actual != Process.GetCurrentProcess().Id && foreground && !modifiers;
         }
 
-        public bool IsForeground { get { return GetForegroundWindow() == Window; } }
+        public bool IsForeground
+        {
+            get
+            {
+                return GetForegroundWindow() == Window;
+            }
+        }
 
         public async Task<bool> TryPasteAsync()
         {
@@ -234,6 +240,13 @@ namespace DeskPill
         static extern void CoUninitialize();
         public static Task<bool> OpenAsync(DesktopNotification item)
         {
+            return OpenAsync(item, CancellationToken.None);
+        }
+
+        public static Task<bool> OpenAsync(DesktopNotification item, CancellationToken token)
+        {
+            if (token.IsCancellationRequested)
+                return Task.FromResult(false);
             string id = item.AppId;
             var completion = new TaskCompletionSource<bool>();
             var worker = new Thread(delegate ()
@@ -241,7 +254,7 @@ namespace DeskPill
                 int initialized = CoInitializeEx(IntPtr.Zero, 2);
                 try
                 {
-                    completion.TrySetResult(initialized >= 0 && Open(new DesktopNotification { AppId = id }));
+                    completion.TrySetResult(initialized >= 0 && Open(new DesktopNotification { AppId = id }, token));
                 }
                 catch
                 {
@@ -261,10 +274,17 @@ namespace DeskPill
 
         public static bool Open(DesktopNotification item)
         {
+            return Open(item, CancellationToken.None);
+        }
+
+        static bool Open(DesktopNotification item, CancellationToken token)
+        {
             IntPtr list = IntPtr.Zero;
             try
             {
+                token.ThrowIfCancellationRequested();
                 list = Resolve(item.AppId);
+                token.ThrowIfCancellationRequested();
                 if (list == IntPtr.Zero)
                     return false;
                 // Invoke the registered Shell item, with no command line from notification text.
@@ -276,6 +296,7 @@ namespace DeskPill
                     idList = list,
                     show = 1
                 };
+                token.ThrowIfCancellationRequested();
                 return ShellExecuteEx(ref info);
             }
             catch
