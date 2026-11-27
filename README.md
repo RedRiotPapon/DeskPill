@@ -21,7 +21,7 @@ The notch yields to occupied title-bar space, supports fullscreen hiding, and re
 
 ## Run it
 
-Build locally using the instructions below, then launch `bin\DeskPill.exe`. No installer or additional app runtime is required on a system with .NET Framework 4.8.
+Download the portable ZIP from [Releases](https://github.com/RedRiotPapon/DeskPill/releases/latest), extract it, and run `DeskPill.exe`. You can also build locally using the instructions below. No installer or additional app runtime is required on a system with .NET Framework 4.8.
 
 1. Hover over the top-center notch to expand it.
 2. Use the dots, arrows or mouse wheel to change pages.
