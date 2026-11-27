@@ -47,6 +47,28 @@ class InteractionTests {
     foreach(var pose in new[]{NotchPose.Compact,NotchPose.Expanded,NotchPose.OptionsDock,NotchPose.Compact}){Call(w,"SetPose",pose);Check(shadow.Opacity==0 && shadow.Color==Colors.Black,"Halo in "+theme+" "+pose);}
    }} finally {Call(w,"ApplyTheme","Classic");Call(w,"Cleanup");}
   });
+  Test("Saving Floating style realigns every content layer with the shell",delegate {
+   var state=new AppState();state.Settings.FastAnimations=true;var w=new IslandWindow(state,new StateStore(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"style-fixture")),false,true);Call(w,"SetOpen",false);Call(w,"ShowSettings");var settings=(SettingsWindow)Field(w,"settingsWindow");
+   Controls<Button>(settings).Single(b=>Convert.ToString(b.Content)=="General").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+   Controls<ComboBox>(settings).Single(c=>c.Items.Contains("Floating") && c.Items.Contains("Classic")).SelectedItem="Floating";
+   Controls<Button>(settings).Single(b=>Convert.ToString(b.Content)=="Save changes").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+   Check(Canvas.GetTop((FrameworkElement)Field(w,"compact"))==10,"Compact content did not follow Floating shell");
+   Check(Canvas.GetTop((FrameworkElement)Field(w,"headerRow"))==28,"Header did not follow Floating shell");
+   Call(w,"Cleanup");
+  });
+  Test("Status ring source updates its icon and None hides both rings",delegate {
+   var w=Island();var state=(AppState)Field(w,"state");var ring=(Ring)Field(w,"compactRing");
+   state.Settings.StatusRing="Tasks";Call(w,"UpdateValues");Check(ring.IconGlyph!="\uEB42","Tasks still uses the water icon");
+   state.Settings.StatusRing="None";Call(w,"UpdateValues");Check(ring.Visibility!=Visibility.Visible && ((Ring)Field(w,"expandedRing")).Visibility!=Visibility.Visible,"None still displays a ring");
+   state.Settings.StatusRing="Focus";Call(w,"UpdateValues");Check(ring.Visibility==Visibility.Visible && ring.Progress>=0 && ring.Progress<=1,"Focus ring did not restore");Call(w,"Cleanup");
+  });
+  Test("Dictation preferences remain optional and staged until saved",delegate {
+   var w=Island();var state=(AppState)Field(w,"state");Call(w,"ShowSettings");var settings=(SettingsWindow)Field(w,"settingsWindow");
+   Controls<Button>(settings).Single(b=>Convert.ToString(b.Content)=="Dictation").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+   var toggle=Controls<CheckBox>(settings).Single(c=>Convert.ToString(c.Content).StartsWith("Enable English dictation"));
+   Check(toggle.IsChecked==false && !state.Settings.DictationEnabled,"Dictation was not optional");toggle.IsChecked=true;settings.Close();
+   Check(!state.Settings.DictationEnabled,"Cancel enabled dictation");Call(w,"Cleanup");
+  });
   Test("Hidden pages disappear from carousel, dots and dock",delegate {
    var state=new AppState();state.Settings.HiddenPages=new[]{"Music","Water","Focus","Shelf"};state.Settings.FastAnimations=true;
    var w=new IslandWindow(state,new StateStore(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"hidden-fixture")),true,true);

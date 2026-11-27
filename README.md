@@ -15,6 +15,7 @@ DeskPill is a small desktop notch that expands when you need it. Control your mu
 - **Tasks & water:** lightweight tasks and optional hydration tracking.
 - **Windows notifications:** previews with Open app, Copy and Recent actions, app-level interruption controls, and an in-memory history of the last 50 arrivals.
 - **Quick tools:** searchable clipboard history with keyboard selection and plain-text paste back to your previous app, screen OCR, calendar import, and an optional Gemini assistant.
+- **English dictation:** optional offline speech to text with its own listening panel, Win+Space shortcut, cancellation and guarded paste. No separate app is required.
 - **Personalization:** Classic plus seven skins, live theme preview, and your own six-color Custom palette with matte/satin finish and outline strength.
 
 The notch yields to occupied title-bar space, supports fullscreen hiding, and respects Windows reduced-motion settings. Startup is opt-in.
@@ -33,6 +34,7 @@ Download the portable ZIP from [Releases](https://github.com/RedRiotPapon/DeskPi
 | `Ctrl+Alt+Space` | Open Ask |
 | `Ctrl+Alt+T` | Select a screen region for OCR |
 | `Ctrl+Alt+V` | Search clipboard history and paste to the previous app |
+| `Win+Space` | Start/finish dictation, when enabled |
 
 Shortcuts can conflict with other applications; the tray menu remains available. Settings also offers click-to-open mode, display selection, scale, position, page order and visibility. Hiding a page keeps its data.
 
@@ -43,6 +45,14 @@ Shortcuts can conflict with other applications; the tray menu remains available.
 Use **Recent notifications** in the tray or right-click menu to review arrivals. Notifications received while you use a page wait without a 30-second expiry; only the newest eligible deferred arrival peeks afterward. History stays in memory and clears on exit.
 
 **Settings → Pages** lets you hide unused pages and reorder the rest. Keep at least one visible.
+
+## Optional English dictation
+
+Open **Settings → Dictation**, install the speech pack (about 54 MB), enable dictation and save. Press **Win+Space** to start, speak, then press it again to finish. **Esc** discards the recording. A small listening panel shows the recording duration and responds to microphone input. The limit is 90 seconds.
+
+While enabled, DeskPill takes over Win+Space, which Windows normally uses to switch input languages. Disabling dictation restores that shortcut. This is optional and off by default. No microphone capture runs while idle, and the speech model loads only for transcription in `DeskPill.Speech.exe`; that worker exits afterward to free its memory. Keep both executables together when extracting the portable ZIP.
+
+Recognition runs locally using Vosk and a small English model. The first setup needs internet access; speech audio does not leave your PC and is not written to a recording file. If you switch apps before transcription finishes, DeskPill offers review instead of unexpectedly pasting into another app. Names, accents and punctuation can need correction. See [speech components and licenses](THIRD_PARTY_NOTICES.md).
 
 ## Make it yours
 
@@ -59,7 +69,7 @@ You need Windows, .NET Framework 4.8 and Windows SDK metadata (`Windows.winmd`).
 ```powershell
 .\build.ps1            # Compile to bin/DeskPill.exe
 .\build.ps1 -Test      # Build and run all test suites
-.\package.ps1          # Create dist/DeskPill-1.1.0-portable.zip
+.\package.ps1          # Create dist/DeskPill-1.2.0-portable.zip
 ```
 
 The solution is also available as `DeskPill.sln`. Full UI, media and OCR probes require an interactive Windows desktop; CI runs the deterministic suites. See [CONTRIBUTING.md](CONTRIBUTING.md).

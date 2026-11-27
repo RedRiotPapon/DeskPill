@@ -103,6 +103,8 @@ namespace DeskPill
             return window != IntPtr.Zero && expected != 0 && expected == actual && actual != Process.GetCurrentProcess().Id && foreground && !modifiers;
         }
 
+        public bool IsForeground { get { return GetForegroundWindow() == Window; } }
+
         public async Task<bool> TryPasteAsync()
         {
             uint actual;

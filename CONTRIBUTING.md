@@ -24,3 +24,5 @@ Useful commands:
 Report bugs through GitHub Issues with Windows version, monitor scale, app version and steps to reproduce. Do not include notification text, clipboard history or API keys.
 
 Run motion measurements alone on an idle interactive desktop. They record WPF callback pacing, not actual compositor presentation times. The paste delivery probe briefly activates its own test windows and intercepts Ctrl+V without reading or changing the clipboard.
+
+Optional speech verification: after installing the English pack in Settings, run `./scripts/test-dictation-speech.ps1`. It synthesizes an English fixture with a Windows TTS voice and runs DeskPill's independent speech worker without microphone or clipboard access. `-Install` explicitly downloads the pack if missing. `./tests/dictation.ps1` covers bounded WAV encoding, shortcut state, cancellation and checksum guards without downloading assets.

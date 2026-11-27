@@ -23,3 +23,5 @@ To reproduce, build and then run this alone on an interactive desktop:
 ```
 
 The report stays in ignored `artifacts/`. It contains timing and display metadata, with no private app state or desktop captures. Broader hardware testing should include physical 100%/150%/200% display transitions, battery power and application load before making general smoothness claims.
+
+The v1.2 layout/dictation build was checked with the same isolated transition probe: 1,097 samples, median 6.94 ms, p95 7.50 ms, p99 15.99 ms and maximum 24.33 ms; 28 intervals exceeded 1.5× refresh budget. All four software DPI bounds passed. This continues to show occasional hitches rather than a general improvement claim. The dictation indicator itself was visually checked; it is not a microphone-to-screen latency benchmark.

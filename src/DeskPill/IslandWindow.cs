@@ -41,6 +41,7 @@ namespace DeskPill
         ClipboardPalette clipboardPalette;
         DesktopNotification currentNotification;
         bool notificationLaunching;
+        DictationController dictation;
         internal bool RuntimeProbeMode { get; set; }
         Border notificationCard;
         readonly DispatcherTimer heartbeat = new DispatcherTimer(), closeTimer = new DispatcherTimer(), hoverTimer = new DispatcherTimer(), hudTimer = new DispatcherTimer(), tabWatchTimer = new DispatcherTimer();
@@ -423,6 +424,7 @@ namespace DeskPill
                     return;
                 }
 
+                if (!preview) {dictation=new DictationController(this,state.Settings,Notify,delegate {if(pose==NotchPose.NotificationPeek)DismissNotification();SetOpen(false);});dictation.Configure();}
                 SetupTray();
                 lastVolume = SystemService.GetVolume();
                 lastMuted = SystemService.GetMuted();
@@ -578,6 +580,7 @@ namespace DeskPill
             {
                 Dispatcher.BeginInvoke(new Action(StartOcr));
             });
+            menu.Items.Add("Dictation (Win+Space, optional)", null, delegate { Dispatcher.BeginInvoke(new Action(delegate {if(dictation!=null)dictation.Toggle();})); });
             menu.Items.Add("Clipboard palette", null, delegate { Dispatcher.BeginInvoke(new Action(ShowClipboardPalette)); });
             menu.Items.Add("Recent notifications", null, delegate { Dispatcher.BeginInvoke(new Action(ShowRecentNotifications)); });
             menu.Items.Add("Exit DeskPill", null, delegate
@@ -622,6 +625,7 @@ namespace DeskPill
             AddMenu(menu, "Today & calendar", ShowInlineToday);
             AddMenu(menu, "Ask DeskPill    Ctrl+Alt+Space", ShowInlineAsk);
             AddMenu(menu, "Copy text from screen    Ctrl+Alt+T", StartOcr);
+            AddMenu(menu, "Dictation    Win+Space (optional)", delegate {if(dictation!=null)dictation.Toggle();});
             AddMenu(menu, "Clipboard palette    Ctrl+Alt+V", ShowClipboardPalette);
             AddMenu(menu, "Recent notifications", ShowRecentNotifications);
             AddMenu(menu, "Notification access…", async delegate { await RequestNotificationAccess(); });
@@ -775,6 +779,7 @@ namespace DeskPill
             bool showDock, showHud;
             TargetDimensions(pose, out w, out h, out showDock, out showHud);
             motion.SetStyle(IsFloating);
+            LayoutLayersTopOffset();
             motion.SnapPose(w, h, showDock, showHud);
         }
 
@@ -809,6 +814,7 @@ namespace DeskPill
             Left = Math.Round(screenLeftDip + (screenWidthDip - Width) * 0.5);
             double desiredTop = screenTopDip + state.Settings.OffsetY + (preview ? 210.0 : 0.0);
             Top = Math.Round(Math.Min(desiredTop, workBottomDip - Height));
+            motion.SetStyle(IsFloating);
             LayoutLayersTopOffset();
             if (!preview && !capture && IsVisible)
                 NativeMethods.EnsureTopmost(hwnd);
@@ -825,6 +831,8 @@ namespace DeskPill
                 Canvas.SetTop(compact, yOff);
             if (hudCard != null)
                 Canvas.SetTop(hudCard, yOff + 2.0);
+            if (notificationCard != null)
+                Canvas.SetTop(notificationCard, yOff + 6.0);
             if (headerRow != null)
                 Canvas.SetTop(headerRow, yOff + 18.0);
             Canvas.SetTop(pageViewport, yOff + PageTopY);
@@ -951,6 +959,7 @@ namespace DeskPill
 
         void ProcessPointer(double x, double y, DateTime now)
         {
+            if(dictation!=null && dictation.Active)return;
             bool inside = PointerBounds(open ? 12.0 : 0.0).Contains(x, y);
             if (pose == NotchPose.NotificationPeek)
             {
@@ -1503,7 +1512,7 @@ namespace DeskPill
                 if (state.Settings.FullscreenNotifications == "History only") notificationHistory.ClearPending();
                 return;
             }
-            if (open || dragHovering || contextMenuOpen || !IsVisible || pose == NotchPose.NotificationPeek || clipboardPalette != null || historyWindow != null || settingsWindow != null || notificationLaunching) return;
+            if (open || dragHovering || contextMenuOpen || !IsVisible || pose == NotchPose.NotificationPeek || clipboardPalette != null || historyWindow != null || settingsWindow != null || (dictation!=null && dictation.Active) || notificationLaunching) return;
             var next = notificationHistory.Take(state.Settings,focus.Running && focus.Phase == "Focus");
             if (next != null) ShowNotification(next);
         }
@@ -2950,10 +2959,18 @@ namespace DeskPill
             var now = DateTime.Now;
             double progress = state.Settings.StatusRing == "Tasks" ? (state.Tasks.Count == 0 ? 0 : (double)state.Tasks.Count(t => t.Done) / state.Tasks.Count) : state.Settings.StatusRing == "Battery" ? Math.Max(0, SystemService.BatteryPercent()) / 100.0 : state.Settings.StatusRing == "None" ? 0 : state.Settings.StatusRing == "Focus" ? 1 - focus.Remaining(DateTime.UtcNow).TotalMinutes / (focus.Phase == "Focus" ? state.Settings.FocusMinutes : focus.Phase == "Short break" ? state.Settings.ShortBreakMinutes : state.Settings.LongBreakMinutes) : (double)state.WaterMl / state.Settings.WaterGoalMl;
 
-            if (compactRing != null)
-                compactRing.Progress = progress;
-            if (expandedRing != null)
-                expandedRing.Progress = progress;
+            string sourceName = state.Settings.StatusRing;
+            string glyph = sourceName == "Tasks" ? "\uE73E" : sourceName == "Battery" ? "\uE83F" : sourceName == "Focus" ? "\uE916" : "\uEB42";
+            Brush accent = sourceName == "Tasks" ? PageAccent("Tasks") : sourceName == "Focus" ? PageAccent("Focus") : sourceName == "Battery" ? Ui.Green : Ui.Hex("#379CF8");
+            foreach (var ring in new[] { compactRing, expandedRing })
+            {
+                if (ring == null) continue;
+                ring.Visibility = sourceName == "None" ? Visibility.Hidden : Visibility.Visible;
+                ring.IconGlyph = glyph;
+                if(!object.ReferenceEquals(ring.Accent,accent)){ring.Accent=accent;ring.InvalidateVisual();}
+                ring.Progress = progress;
+                ring.ToolTip = sourceName + " · " + (Math.Max(0, Math.Min(1, progress))*100).ToString("0") + "%";
+            }
 
             bool isPlaying = media.Current.Playing;
             if (compactEq != null)
@@ -3238,6 +3255,7 @@ namespace DeskPill
 
         void ShowSettings()
         {
+            if(dictation!=null && dictation.Active)dictation.Cancel();
             closeTimer.Stop();
             if (settingsWindow != null)
             {
@@ -3262,6 +3280,7 @@ namespace DeskPill
                 SyncDockStates();
                 SnapPoseImmediate();
                 ContextMenu=BuildMenu();
+                if(dictation!=null)dictation.Configure();
                 if (pose == NotchPose.NotificationPeek && (currentNotification == null || !NotificationHistory.Allowed(currentNotification,state.Settings,focus.Running && focus.Phase == "Focus"))) DismissNotification();
             }, Notify, ApplyTheme, notificationHistory.Items);
             settingsWindow.Closed += delegate { settingsWindow = null; };
@@ -3407,6 +3426,7 @@ namespace DeskPill
 
         void Cleanup()
         {
+            if(dictation!=null){dictation.Dispose();dictation=null;}
             ClearOutgoingPage();
             hoverTimer.Stop();
             hudTimer.Stop();

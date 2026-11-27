@@ -29,6 +29,7 @@ namespace DeskPill
         readonly StackPanel content = new StackPanel();
         readonly List<Button> navigation = new List<Button>();
         bool startupTouched, clearKey;
+        System.Threading.CancellationTokenSource speechInstall;
         PasswordBox apiKey;
         TextBlock keyStatus;
         ListBox pageList;
@@ -84,6 +85,7 @@ namespace DeskPill
             AddPage(nav, "Pages", Pages());
             AddPage(nav, "Focus & water", FocusWater());
             AddPage(nav, "Clipboard", Clipboard());
+            AddPage(nav, "Dictation", Dictation());
             AddPage(nav, "Notifications", NotificationOptions(knownNotifications ?? new DesktopNotification[0]));
             AddPage(nav, "Calendar", Calendar());
             AddPage(nav, "Ask & weather", Ask());
@@ -431,6 +433,26 @@ namespace DeskPill
             return p;
         }
 
+        StackPanel Dictation()
+        {
+            var p=Page("Dictation", "English speech to text, privately on your PC. Optional and off by default.");
+            Check(p,"Enable English dictation · Win+Space","DictationEnabled");
+            Note(p,"Win+Space starts recording; press it again to finish. Esc cancels. While enabled, this replaces Windows’ Win+Space language switch. Disabling restores it.");
+            Note(p,"Install the English speech pack once (about 54 MB download). Recognition runs on-device in a separate worker, which exits after each transcription to release its model memory. No microphone access while idle. Recordings are limited to 90 seconds.");
+            var status=Ui.Text(SpeechAssets.Ready?"English speech pack is ready.":"English speech pack is not installed.",12,Ui.Muted);status.TextWrapping=TextWrapping.Wrap;status.Margin=new Thickness(0,12,0,8);p.Children.Add(status);
+            Button install=null;install=Ui.Button("Install / repair English speech",async delegate
+            {
+                install.IsEnabled=false;speechInstall=new System.Threading.CancellationTokenSource();
+                try{await SpeechAssets.InstallAsync(delegate(string message){Dispatcher.BeginInvoke(new Action(delegate{status.Text=message;}));},speechInstall.Token,true);}
+                catch(OperationCanceledException){status.Text="Installation cancelled.";}
+                catch(Exception e){status.Text=speechInstall.IsCancellationRequested?"Installation cancelled.":"Installation failed: "+e.Message;}
+                finally{install.IsEnabled=true;speechInstall.Dispose();speechInstall=null;}
+            });p.Children.Add(install);
+            Closed+=delegate{if(speechInstall!=null)speechInstall.Cancel();};
+            Note(p,"Speech recognition uses Vosk and its small US English model (Apache 2.0). It may miss names, accents and punctuation. Review is offered if you switch apps before the result is ready. No speech account or API key is needed.");
+            return p;
+        }
+
         StackPanel Pages()
         {
             var p = Page("Pages", "Reorder pages, then choose which ones appear in navigation. Hidden pages keep their data.");
@@ -644,6 +666,7 @@ namespace DeskPill
             {
                 foreach (var read in readers)
                     read();
+                if (draft.DictationEnabled && !SpeechAssets.Ready) throw new InvalidOperationException("Install the English speech pack in Dictation before enabling it.");
                 if (!string.IsNullOrWhiteSpace(apiKey.Password))
                     draft.ProtectedApiKey = AskService.ProtectKey(apiKey.Password.Trim());
                 else if (clearKey)
