@@ -1,4 +1,4 @@
-param([string]$Output,[string]$AssemblyPath)
+param([string]$Output,[string]$AssemblyPath,[string]$Theme="Ghibli Meadow")
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 if (!$Output) { $Output=Join-Path $root 'artifacts/motion-measurement.json' }
@@ -12,5 +12,5 @@ foreach($assembly in @('WindowsBase','PresentationCore','PresentationFramework')
 $arguments+=Join-Path $root 'tools/MotionMeasurements.cs'
 & (Join-Path $framework 'csc.exe') @arguments
 if($LASTEXITCODE -ne 0){throw 'Motion measurement compilation failed'}
-& (Join-Path $directory 'MotionMeasurements.exe') $Output
+& (Join-Path $directory 'MotionMeasurements.exe') $Output $Theme
 if($LASTEXITCODE -ne 0){throw 'Motion measurement failed'}

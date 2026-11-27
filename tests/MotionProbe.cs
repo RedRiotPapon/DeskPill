@@ -120,10 +120,11 @@ class MotionProbe
         Console.WriteLine("FRAME " + name + " shape=" + ShapeWidth(w).ToString("0.0") + "x" + Height(w).ToString("0.0") + " window=" + w.Width + "x" + w.Height);
     }
 
-    static double[] CadenceSamples(int hz,int transition,bool stall)
+    static double[] CadenceSamples(int hz,int transition,bool stall,double pace=1)
     {
         var type=typeof(IslandWindow).Assembly.GetType("DeskPill.IslandMotion");
         var motion=type.GetConstructors(BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic).Single().Invoke(new object[]{new System.Windows.Shapes.Path(),new System.Windows.Shapes.Path(),new Canvas(),null});
+        type.GetField("TimeScale").SetValue(motion,pace);
         bool opening=transition==0,closing=transition==2,tiny=transition==3,dock=transition==1;
         type.GetMethod("SnapPose").Invoke(motion,new object[]{opening?150.0:396.0,opening?30.0:172.0,false,false});
         type.GetMethod("MoveToPose").Invoke(motion,new object[]{tiny?52.0:closing?150.0:396.0,tiny?6.0:closing?30.0:dock?206.0:172.0,dock,false,opening,closing,tiny,false,null});
@@ -157,6 +158,8 @@ class MotionProbe
             var interrupted=CadenceSamples(60,transition,true);double stallError=interrupted.Select((v,i)=>Math.Abs(v-reference[i])).Max();
             Check(stallError<3.0,names[transition]+" retains timing through a simulated 50 ms frame gap (max delta "+stallError.ToString("0.00")+" DIP)");
         }
+        var slow=CadenceSamples(60,0,false,.7);var fast=CadenceSamples(60,0,false,1.3);
+        Check(fast[2]>slow[2]+20 && Math.Abs(slow[7]-172)<3 && Math.Abs(fast[7]-172)<3,"Animation pace changes travel timing while retaining the settled pose");
     }
 
     static void VerifySpringPhysics()

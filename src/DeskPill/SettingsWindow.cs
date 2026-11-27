@@ -17,6 +17,8 @@ namespace DeskPill
         readonly AppState state;
         readonly Action apply;
         readonly Action<string> previewTheme;
+        readonly Action<Settings,bool> previewPreferences;
+        StackPanel glassPanel;
         readonly string savedTheme;
         readonly Settings savedAppearance;
         readonly Dictionary<string, TextBox> customColors = new Dictionary<string, TextBox>();
@@ -33,7 +35,7 @@ namespace DeskPill
         PasswordBox apiKey;
         TextBlock keyStatus;
         ListBox pageList;
-        public SettingsWindow(AppState state, Action apply, Action<string> notify, Action<string> previewTheme = null, IEnumerable<DesktopNotification> knownNotifications = null)
+        public SettingsWindow(AppState state, Action apply, Action<string> notify, Action<string> previewTheme = null, IEnumerable<DesktopNotification> knownNotifications = null, Action<Settings,bool> previewPreferences = null)
         {
             this.state = state;
             this.apply = apply;
@@ -43,7 +45,8 @@ namespace DeskPill
             savedAppearance = Clone(state.Settings);
             Themes.ConfigureCustom(draft);
             this.previewTheme = previewTheme ?? Themes.Apply;
-            Closed += delegate { if (!themeCommitted) { Themes.ConfigureCustom(savedAppearance); this.previewTheme(savedTheme); } };
+            this.previewPreferences=previewPreferences??delegate{};
+            Closed += delegate { if (!themeCommitted) { Themes.ConfigureCustom(savedAppearance); this.previewTheme(savedTheme); this.previewPreferences(savedAppearance,false); } };
             Title = "DeskPill Settings";
             Width = 820;
             Height = 620;
@@ -72,7 +75,7 @@ namespace DeskPill
             {
                 Margin = new Thickness(0, 0, 18, 0)
             };
-            body.Children.Add(nav);
+            body.Children.Add(new ScrollViewer {Content=nav,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
             var scroll = new ScrollViewer
             {
                 Content = content,
@@ -82,6 +85,8 @@ namespace DeskPill
             body.Children.Add(scroll);
             AddPage(nav, "General", General());
             AddPage(nav, "Appearance", Appearance());
+            AddPage(nav, "Motion", MotionOptions());
+            AddPage(nav, "Gaming", GamingOptions());
             AddPage(nav, "Pages", Pages());
             AddPage(nav, "Focus & water", FocusWater());
             AddPage(nav, "Clipboard", Clipboard());
@@ -106,7 +111,7 @@ namespace DeskPill
             });
             DockPanel.SetDock(cancel, Dock.Right);
             footer.Children.Add(cancel);
-            footer.Children.Add(Ui.Text("Themes preview immediately. Save keeps your changes.", 11, Ui.Muted));
+            footer.Children.Add(Ui.Text("Preview changes here. Save keeps them; Cancel restores them.", 11, Ui.Muted));
             Content = root;
             navigation[0].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         }
@@ -126,8 +131,8 @@ namespace DeskPill
         {
             var button = Ui.Button(title, null);
             button.HorizontalContentAlignment = HorizontalAlignment.Left;
-            button.Margin = new Thickness(0, 0, 0, 6);
-            button.Padding = new Thickness(12, 10, 8, 10);
+            button.Margin = new Thickness(0, 0, 0, 3);
+            button.Padding = new Thickness(12, 6, 8, 6);
             button.Click += delegate
             {
                 content.Children.Clear();
@@ -272,12 +277,23 @@ namespace DeskPill
                 choice.Checked += delegate
                 {
                     draft.Theme = name;
+                    if(glassPanel!=null)glassPanel.Visibility=name=="Glass"?Visibility.Visible:Visibility.Collapsed;
                     Themes.ConfigureCustom(draft);
                     this.previewTheme(name);
                 };
                 if (name == "Custom") customChoice = choice;
                 choices.Add(choice);
                 p.Children.Add(choice);
+                if(name=="Glass")
+                {
+                    glassPanel=Page("Glass finish","Tint the surface while lettering stays opaque. This is translucent glass with a highlight, without background blur.");
+                    glassPanel.Margin=new Thickness(22,0,0,12);glassPanel.Visibility=draft.Theme=="Glass"?Visibility.Visible:Visibility.Collapsed;
+                    Action glassPreview=delegate{Themes.ConfigureCustom(draft);this.previewTheme(draft.Theme);};
+                    PreferenceSlider(glassPanel,"Surface opacity","GlassOpacity",35,95,"%",glassPreview);
+                    PreferenceSlider(glassPanel,"Highlight","GlassHighlight",0,80,"%",glassPreview);
+                    Note(glassPanel,"Lower opacity reveals more of the app behind the notch. Values below 60% can reduce text contrast over bright content.");
+                    p.Children.Add(glassPanel);
+                }
             }
             readers.Add(delegate { foreach (var choice in choices) if (choice.IsChecked == true) draft.Theme = (string)choice.Tag; });
             Label(p, "Your palette");
@@ -304,12 +320,8 @@ namespace DeskPill
             p.Children.Add(finishRow);
             Label(p, "Outline strength");
             var outline = new Slider { Minimum = 0, Maximum = 60, Value = draft.CustomOutline, TickFrequency = 1, IsSnapToTickEnabled = true, Margin = new Thickness(0, 4, 0, 8) };
-            outline.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='Slider'>
-<Grid Height='26' Margin='8,0'><Border Height='3' VerticalAlignment='Center' Background='{DynamicResource DeskPillTooltipLine}' CornerRadius='1.5'/><Track x:Name='PART_Track' Minimum='{TemplateBinding Minimum}' Maximum='{TemplateBinding Maximum}' Value='{Binding Value, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}' IsDirectionReversed='{TemplateBinding IsDirectionReversed}'>
-<Track.DecreaseRepeatButton><RepeatButton Command='{x:Static Slider.DecreaseLarge}' IsTabStop='False'><RepeatButton.Template><ControlTemplate TargetType='RepeatButton'><Border Height='3' VerticalAlignment='Center' Background='{DynamicResource DeskPillAccent}' CornerRadius='1.5'/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.DecreaseRepeatButton>
-<Track.Thumb><Thumb Width='14' Height='14' Cursor='Hand'><Thumb.Template><ControlTemplate TargetType='Thumb'><Border CornerRadius='7' Background='{DynamicResource DeskPillAccent}'/></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
-<Track.IncreaseRepeatButton><RepeatButton Command='{x:Static Slider.IncreaseLarge}' IsTabStop='False'><RepeatButton.Template><ControlTemplate TargetType='RepeatButton'><Border Background='Transparent'/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.IncreaseRepeatButton>
-</Track></Grid></ControlTemplate>");
+            outline.Tag="CustomOutline";
+            outline.Template = PreferenceSliderTemplate();
             var amount = Ui.Text(draft.CustomOutline + "%", 11, Ui.Muted);
             outline.ValueChanged += delegate { draft.CustomOutline = (int)Math.Round(outline.Value); amount.Text = draft.CustomOutline + "%"; PreviewCustom(); };
             System.Windows.Automation.AutomationProperties.SetName(outline, "Custom outline strength"); p.Children.Add(outline); p.Children.Add(amount);
@@ -430,6 +442,146 @@ namespace DeskPill
             Check(p, "Play reminder sounds", "Sound");
             Check(p, "Use fast animations", "FastAnimations");
             Choice(p, "Status ring", "StatusRing", new[] { "Water", "Tasks", "Battery", "Focus", "None" });
+            return p;
+        }
+
+        static ControlTemplate PreferenceSliderTemplate()
+        {
+            return (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='Slider'>
+<Grid Height='26' Margin='8,0'><Border Height='3' VerticalAlignment='Center' Background='{DynamicResource DeskPillTooltipLine}' CornerRadius='1.5'/><Track x:Name='PART_Track' Minimum='{TemplateBinding Minimum}' Maximum='{TemplateBinding Maximum}' Value='{Binding Value, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}' IsDirectionReversed='{TemplateBinding IsDirectionReversed}'>
+<Track.DecreaseRepeatButton><RepeatButton Command='{x:Static Slider.DecreaseLarge}' IsTabStop='False'><RepeatButton.Template><ControlTemplate TargetType='RepeatButton'><Border Height='3' VerticalAlignment='Center' Background='{DynamicResource DeskPillAccent}' CornerRadius='1.5'/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.DecreaseRepeatButton>
+<Track.Thumb><Thumb Width='14' Height='14' Cursor='Hand'><Thumb.Template><ControlTemplate TargetType='Thumb'><Border CornerRadius='7' Background='{DynamicResource DeskPillAccent}'/></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
+<Track.IncreaseRepeatButton><RepeatButton Command='{x:Static Slider.IncreaseLarge}' IsTabStop='False'><RepeatButton.Template><ControlTemplate TargetType='RepeatButton'><Border Background='Transparent'/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.IncreaseRepeatButton>
+</Track></Grid></ControlTemplate>");
+        }
+
+        Slider PreferenceSlider(StackPanel page, string label, string field, int min, int max, string unit, Action changed)
+        {
+            var info = typeof(Settings).GetField(field);
+            var row = new DockPanel
+            {
+                Margin = new Thickness(0, 8, 0, 2)
+            };
+            var labelText = Ui.Text(label, 12, Ui.White);
+            var value = Ui.Text(Convert.ToString(info.GetValue(draft)) + unit, 12, Ui.Muted);
+            value.HorizontalAlignment = HorizontalAlignment.Right;
+            var slider = new Slider
+            {
+                Minimum = min,
+                Maximum = max,
+                Value = (int)info.GetValue(draft),
+                SmallChange = unit == " ms" ? 10 : field == "MotionPace" ? 5 : 1,
+                LargeChange = unit == " ms" ? 50 : 10,
+                IsSnapToTickEnabled = true,
+                TickFrequency = unit == " ms" ? 10 : field == "MotionPace" ? 5 : 1,
+                Foreground = Ui.Green,
+                Margin = new Thickness(0, 0, 0, 10),
+                Tag = field
+            };
+            slider.Template = PreferenceSliderTemplate();
+            System.Windows.Automation.AutomationProperties.SetName(slider, label);
+            slider.ValueChanged += delegate
+            {
+                info.SetValue(draft, (int)Math.Round(slider.Value));
+                value.Text = ((int)Math.Round(slider.Value)) + unit;
+                changed();
+            };
+            DockPanel.SetDock(value, Dock.Right);
+            row.Children.Add(value);
+            row.Children.Add(labelText);
+            page.Children.Add(row);
+            page.Children.Add(slider);
+            readers.Add(delegate
+            {
+                info.SetValue(draft, (int)Math.Round(slider.Value));
+            });
+            return slider;
+        }
+
+        StackPanel MotionOptions()
+        {
+            var p = Page("Motion", "Adjust when the notch responds, then choose how quickly it moves. Changes preview immediately; Cancel restores your saved settings.");
+            Action update = delegate
+            {
+                previewPreferences(draft, false);
+            };
+            var opening = PreferenceSlider(p, "Open after", "HoverOpenMs", 0, 600, " ms", update);
+            var options = PreferenceSlider(p, "Options after", "HoverOptionsMs", 0, 600, " ms", update);
+            var closing = PreferenceSlider(p, "Close after", "HoverCloseMs", 150, 1200, " ms", update);
+            var pace = PreferenceSlider(p, "Animation pace", "MotionPace", 70, 130, "%", update);
+            Note(p, "100% keeps the default spring. Lower values move more slowly; higher values move faster. Hover delays do not affect click actions. Windows reduced motion and Fast animations take priority.");
+            p.Children.Add(Ui.Row(Ui.Button("Try motion", delegate
+            {
+                previewPreferences(draft, true);
+            }), Ui.Button("Reset motion", delegate
+            {
+                opening.Value = 110;
+                options.Value = 130;
+                closing.Value = 360;
+                pace.Value = 100;
+                update();
+            })));
+            return p;
+        }
+
+        StackPanel GamingOptions()
+        {
+            var p = Page("Gaming", "A small glass FPS bar while your game is in front. Optional and off by default.");
+            Check(p, "Use automatic game glass & FPS", "GameOverlay");
+            Check(p, "Detect fullscreen 3D games", "DetectFullscreenGames");
+            Note(p, "Detection is a best effort. Add game executable names below for reliable matching, including windowed games. Browsers and common desktop apps are excluded from automatic detection.");
+            Label(p, "Your games · one executable name per line");
+            var games = Ui.Input(string.Join("\n", draft.GameApps ?? new string[0]));
+            games.Background = Ui.Card;
+            games.AcceptsReturn = true;
+            games.TextWrapping = TextWrapping.Wrap;
+            games.Height = 90;
+            games.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+            p.Children.Add(games);
+            p.Children.Add(Ui.Button("Add game…", delegate
+            {
+                var picker = new OpenFileDialog
+                {
+                    Filter = "Game executable (*.exe)|*.exe"
+                };
+                if (picker.ShowDialog(this) == true)
+                {
+                    string name = Path.GetFileName(picker.FileName);
+                    games.Text = games.Text.Trim() + (games.Text.Trim().Length > 0 ? "\n" : "") + name;
+                }
+            }));
+            readers.Add(delegate
+            {
+                draft.GameApps = games.Text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).ToArray();
+            });
+            var status = Ui.Text(PresentMonAssets.Ready ? (PresentMonAssets.TracePermission ? "FPS component is ready." : "FPS component installed · Windows trace access is needed.") : "Install the optional FPS component to measure game presents.", 12, Ui.Muted);
+            status.TextWrapping = TextWrapping.Wrap;
+            status.Margin = new Thickness(0, 15, 0, 8);
+            p.Children.Add(status);
+            Button install = null;
+            install = Ui.Button("Install FPS component · 1 MB", async delegate
+            {
+                install.IsEnabled = false;
+                try
+                {
+                    await PresentMonAssets.InstallAsync();
+                    status.Text = PresentMonAssets.TracePermission ? "FPS component is ready." : "Installed · Windows trace access is needed.";
+                }
+                catch (Exception e)
+                {
+                    status.Text = "Could not install FPS: " + e.Message;
+                }
+                finally
+                {
+                    install.IsEnabled = true;
+                }
+            });
+            p.Children.Add(install);
+            p.Children.Add(Ui.Button("About FPS access…", delegate
+            {
+                MessageBox.Show(this, "Windows allows FPS tracing for administrators and members of Performance Log Users.\n\nAn administrator can add your Windows account to the local Performance Log Users group in Computer Management → Local Users and Groups → Groups. Sign out and back in for the new permission to take effect.\n\nDeskPill does not change account permissions or request elevation automatically. Game glass still works without FPS access.", "FPS access", MessageBoxButton.OK, MessageBoxImage.Information);
+            }));
+            Note(p, "Uses PresentMon’s Windows presentation trace, without injecting into games. Permissions, protected games and exclusive fullscreen can limit measurement or overlay visibility. If unavailable, the bar shows FPS — rather than an estimated number. Your saved theme returns when the game loses focus.");
             return p;
         }
 

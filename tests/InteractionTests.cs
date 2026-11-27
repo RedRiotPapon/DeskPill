@@ -12,6 +12,8 @@ using System.Threading.Tasks;
 using System.Windows.Threading;
 using DeskPill;
 class InteractionTests {
+ [System.Runtime.InteropServices.DllImport("user32.dll",EntryPoint="GetWindowLongW")]static extern int WindowLong(IntPtr window,int index);
+ static int GameWindowStyle(IntPtr window){return WindowLong(window,-20);}
  static int passed,failed;
  static readonly BindingFlags Private=BindingFlags.Instance|BindingFlags.NonPublic;
  static object Field(object o,string name) { return o.GetType().GetField(name,Private).GetValue(o); }
@@ -68,6 +70,51 @@ class InteractionTests {
    var toggle=Controls<CheckBox>(settings).Single(c=>Convert.ToString(c.Content).StartsWith("Enable English dictation"));
    Check(toggle.IsChecked==false && !state.Settings.DictationEnabled,"Dictation was not optional");toggle.IsChecked=true;settings.Close();
    Check(!state.Settings.DictationEnabled,"Cancel enabled dictation");Call(w,"Cleanup");
+  });
+  Test("Motion preview is immediate, staged and reversible",delegate {
+   var w=Island();var state=(AppState)Field(w,"state");Call(w,"ShowSettings");var settings=(SettingsWindow)Field(w,"settingsWindow");
+   Controls<Button>(settings).Single(b=>Convert.ToString(b.Content)=="Motion").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+   Controls<Slider>(settings).Single(x=>Convert.ToString(x.Tag)=="HoverOpenMs").Value=270;
+   Controls<Slider>(settings).Single(x=>Convert.ToString(x.Tag)=="MotionPace").Value=80;
+   var preview=(Settings)Field(w,"preferencesPreview");var motion=Field(w,"motion");
+   Check(preview.HoverOpenMs==270 && (double)motion.GetType().GetField("TimeScale").GetValue(motion)==.8 && state.Settings.HoverOpenMs==110,"Motion did not preview without saving");
+   settings.Close();Check((double)motion.GetType().GetField("TimeScale").GetValue(motion)==1 && ((Settings)Field(w,"preferencesPreview")).HoverOpenMs==110,"Cancel did not restore motion");Call(w,"Cleanup");
+  });
+  Test("Glass preview keeps content opaque and Cancel restores Classic",delegate {
+   var w=Island();Call(w,"ShowSettings");var settings=(SettingsWindow)Field(w,"settingsWindow");
+   Controls<Button>(settings).Single(b=>Convert.ToString(b.Content)=="Appearance").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+   Controls<RadioButton>(settings).Single(r=>Convert.ToString(r.Tag)=="Glass").IsChecked=true;
+   Controls<Slider>(settings).Single(x=>Convert.ToString(x.Tag)=="GlassOpacity").Value=45;
+   var fill=(GradientBrush)((System.Windows.Shapes.Path)Field(w,"shell")).Fill;
+   Check(Themes.Current=="Glass" && fill.GradientStops.Last().Color.A<140 && ((SolidColorBrush)((TextBlock)Field(w,"compactText")).Foreground).Color.A==255,"Glass faded content or stayed opaque");
+   settings.Close();Check(Themes.Current=="Classic" && ((GradientBrush)((System.Windows.Shapes.Path)Field(w,"shell")).Fill).GradientStops.Last().Color.A==255,"Cancel retained Glass alpha");Call(w,"Cleanup");
+  });
+  Test("Game overlay temporarily uses Glass and restores saved theme and style",delegate {
+   var w=Island();var state=(AppState)Field(w,"state");state.WaterMl=1000;string saved=state.Settings.Theme;
+   Call(w,"SetGameMode",new GameWindow {ProcessId=123,Executable="fixture.exe",Matches=true});
+   Check(Themes.Current=="Glass" && state.Settings.Theme==saved && Convert.ToString(Field(w,"pose"))=="Compact" && ((TextBlock)Field(w,"compactText")).Text.Contains("FPS"),"Game overlay did not stay compact or changed saved theme");
+   Check(((Ring)Field(w,"compactRing")).Progress==0,"Game icon retained an unrelated water progress arc");
+   Call(w,"SetGameMode",new GameWindow());Check(Themes.Current==saved && !(bool)Field(w,"gameModeActive"),"Game exit did not restore saved appearance");Call(w,"Cleanup");
+  });
+  Test("Game overlay toggles native input pass-through and restores it",delegate {
+   var w=Island();w.GetType().GetProperty("RuntimeProbeMode",Private).SetValue(w,true,null);w.Show();
+   var handle=new WindowInteropHelper(w).Handle;
+   Call(w,"SetGameMode",new GameWindow {ProcessId=123,Matches=true});
+   Check((GameWindowStyle(handle)&0x20)!=0,"Game overlay still intercepted mouse input");
+   Call(w,"SetGameMode",new GameWindow());Check((GameWindowStyle(handle)&0x20)==0,"Game exit left the notch unclickable");Call(w,"Cleanup");w.Hide();
+  });
+  Test("Motion reset restores defaults and Save persists a custom profile",delegate {
+   var w=Island();var state=(AppState)Field(w,"state");Call(w,"ShowSettings");var settings=(SettingsWindow)Field(w,"settingsWindow");
+   Controls<Button>(settings).Single(b=>Convert.ToString(b.Content)=="Motion").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+   var delay=Controls<Slider>(settings).Single(x=>Convert.ToString(x.Tag)=="HoverOpenMs");delay.Value=300;
+   Controls<Button>(settings).Single(b=>Convert.ToString(b.Content)=="Reset motion").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Check(delay.Value==110,"Reset did not restore the default delay");
+   delay.Value=240;Controls<Slider>(settings).Single(x=>Convert.ToString(x.Tag)=="MotionPace").Value=85;
+   Controls<Button>(settings).Single(b=>Convert.ToString(b.Content)=="Save changes").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+   Check(state.Settings.HoverOpenMs==240 && state.Settings.MotionPace==85 && state.Settings.GlassOpacity==72,"Saving motion lost the profile or changed untouched Glass opacity");Call(w,"Cleanup");
+  });
+  Test("Explicit opening leaves game input pass-through before showing controls",delegate {
+   var w=Island();Call(w,"SetGameMode",new GameWindow {ProcessId=123,Matches=true});Call(w,"SetOpen",true);
+   Check(!(bool)Field(w,"gameModeActive") && (bool)Field(w,"open") && Themes.Current=="Classic","Explicit controls stayed in game mode");Call(w,"Cleanup");
   });
   Test("Hidden pages disappear from carousel, dots and dock",delegate {
    var state=new AppState();state.Settings.HiddenPages=new[]{"Music","Water","Focus","Shelf"};state.Settings.FastAnimations=true;

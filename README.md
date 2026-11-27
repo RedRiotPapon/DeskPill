@@ -16,9 +16,9 @@ DeskPill is a small desktop notch that expands when you need it. Control your mu
 - **Windows notifications:** previews with Open app, Copy and Recent actions, app-level interruption controls, and an in-memory history of the last 50 arrivals.
 - **Quick tools:** searchable clipboard history with keyboard selection and plain-text paste back to your previous app, screen OCR, calendar import, and an optional Gemini assistant.
 - **English dictation:** optional offline speech to text with its own listening panel, Win+Space shortcut, cancellation and guarded paste. No separate app is required.
-- **Personalization:** Classic plus seven skins, live theme preview, and your own six-color Custom palette with matte/satin finish and outline strength.
+- **Personalization:** Classic, Glass, seven colored skins, live theme preview, and your own six-color Custom palette with matte/satin finish and outline strength.
 
-Hover intent waits at least 110 ms before opening and 130 ms before revealing options, helping brief pointer passes stay quiet. Click actions respond immediately.
+Hover intent defaults to 110 ms before opening and 130 ms before revealing options, helping brief pointer passes stay quiet. Click actions respond immediately. **Settings → Motion** lets you tune those delays, closing grace and animation pace with live preview and reset.
 
 The notch yields to occupied title-bar space, supports fullscreen hiding, and respects Windows reduced-motion settings. Startup is opt-in.
 
@@ -62,7 +62,15 @@ Recognition runs locally using Vosk and a small English model. The first setup n
 
 Open **Settings → Appearance** and select a skin to preview it immediately. **Save changes** keeps it; **Cancel** or closing Settings restores your saved look.
 
+**Classic stays the default. Glass is directly after it.** Select Glass to reveal opacity (35–95%) and highlight controls. Lettering stays opaque while the shell becomes translucent. Glass uses a tint and highlight, without background blur; very low opacity can reduce contrast over bright apps. Changes preview immediately and Cancel restores your saved look.
+
 Choose **Custom** to edit shell, surface, accent, secondary, text and muted colors with hex inputs or color pickers. Change the finish and outline strength while watching the result. One Custom palette is saved locally.
+
+## Optional game glass and FPS
+
+In **Settings → Gaming**, enable automatic game glass to temporarily switch the compact bar to Glass while a game is foreground. It passes mouse input through to the game, displays FPS when available, and restores your saved theme afterward. Automatic detection looks for fullscreen graphics apps; add explicit game executable names for reliable matching and windowed games. You can disable heuristic detection and use only your list.
+
+The optional 1 MB PresentMon component measures game presentation intervals. **Windows requires administrator or Performance Log Users trace access**; Settings explains setup. DeskPill does not grant permissions, request elevation or inject into games. Without access or fresh data, the bar shows **FPS —**. Protected games and exclusive fullscreen can limit tracing or visibility. [Game mode details](docs/GAMING.md).
 
 ## Build and test
 
@@ -71,7 +79,7 @@ You need Windows, .NET Framework 4.8 and Windows SDK metadata (`Windows.winmd`).
 ```powershell
 .\build.ps1            # Compile to bin/DeskPill.exe
 .\build.ps1 -Test      # Build and run all test suites
-.\package.ps1          # Create dist/DeskPill-1.2.1-portable.zip
+.\package.ps1          # Create dist/DeskPill-1.3.0-portable.zip
 ```
 
 The solution is also available as `DeskPill.sln`. Full UI, media and OCR probes require an interactive Windows desktop; CI runs the deterministic suites. See [CONTRIBUTING.md](CONTRIBUTING.md).

@@ -10,8 +10,11 @@ namespace DeskPill
     public class Settings
     {
         public double Scale = 1, OffsetY = 0;
-        public static readonly string[] ThemeNames = { "Classic", "Shinkai Twilight", "Sakura Shrine", "Cyberpunk Akihabara", "Ghibli Meadow", "EVA Unit-01", "Nichirin Flame", "Moonlit Sailor", "Custom" };
+        public static readonly string[] ThemeNames = { "Classic", "Glass", "Shinkai Twilight", "Sakura Shrine", "Cyberpunk Akihabara", "Ghibli Meadow", "EVA Unit-01", "Nichirin Flame", "Moonlit Sailor", "Custom" };
         public string Theme = "Classic";
+        public int CustomizationVersion = 1, HoverOpenMs = 110, HoverOptionsMs = 130, HoverCloseMs = 360, MotionPace = 100, GlassOpacity = 72, GlassHighlight = 35;
+        public bool GameOverlay = false, DetectFullscreenGames = true;
+        public string[] GameApps = new string[0];
         public string CustomShell = "#0C111B", CustomSurface = "#1A2332", CustomAccent = "#8EC9FF", CustomSecondary = "#C2B4F3", CustomText = "#F3F6FC", CustomMuted = "#A7B3C5", CustomFinish = "Satin";
         public int CustomOutline = 18;
         public static string NormalizeTheme(string name)
@@ -124,6 +127,10 @@ namespace DeskPill
             s.ReminderMinutes = Clamp(s.ReminderMinutes, 1, 1440);
             s.Latitude = Bound(s.Latitude, -90, 90, 23.8103);
             s.Longitude = Bound(s.Longitude, -180, 180, 90.4125);
+            if (s.CustomizationVersion < 1) {s.HoverOpenMs=110;s.HoverOptionsMs=130;s.HoverCloseMs=360;s.MotionPace=100;s.GlassOpacity=72;s.GlassHighlight=35;s.DetectFullscreenGames=true;s.CustomizationVersion=1;}
+            s.HoverOpenMs=Clamp(s.HoverOpenMs,0,600);s.HoverOptionsMs=Clamp(s.HoverOptionsMs,0,600);s.HoverCloseMs=Clamp(s.HoverCloseMs,150,1200);s.MotionPace=Clamp(s.MotionPace,70,130);
+            s.GlassOpacity=Clamp(s.GlassOpacity,35,95);s.GlassHighlight=Clamp(s.GlassHighlight,0,80);
+            s.GameApps=(s.GameApps??new string[0]).Where(x=>!string.IsNullOrWhiteSpace(x)&&x.Length<180&&x.IndexOfAny(new[]{'/', '\\', ':', '\"'})<0&&x.EndsWith(".exe",StringComparison.OrdinalIgnoreCase)).Distinct(StringComparer.OrdinalIgnoreCase).Take(40).ToArray();
             if (s.Style != "Floating")
                 s.Style = "Classic";
             if (s.OpenMode != "Click")

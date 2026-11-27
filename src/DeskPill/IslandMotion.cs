@@ -383,8 +383,11 @@ namespace DeskPill
             }
         }
 
+        public double TimeScale = 1.0;
+
         internal void StepPhysics(double dt)
         {
+            dt *= Math.Max(.7,Math.Min(1.3,TimeScale));
             // Sub-step to <= 4ms to keep spring integration stable across frame cadences.
             int steps = Math.Max(1, (int)Math.Ceiling(dt / 0.004));
             double h = dt / steps;

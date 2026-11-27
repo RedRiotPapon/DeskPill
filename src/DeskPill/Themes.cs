@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Data;
@@ -13,6 +13,7 @@ namespace DeskPill
         public static readonly string[] Names = Settings.ThemeNames;
         public static readonly string[] Descriptions = {
             "Classic OLED notch black, crisp mint green & subtle glass rim.",
+            "Translucent charcoal glass, cool silver light and clear lettering.",
             "Blue-hour ink, airy periwinkle and a soft rose accent.",
             "Smoked plum, porcelain lettering and cherry-blossom rose.",
             "Carbon navy, electric cyan and precise magenta accents.",
@@ -29,6 +30,8 @@ namespace DeskPill
         static readonly string[][] Colors = {
             // 0: Classic (Default)
             new[] { "#000000", "#F4F4F4", "#929292", "#48E572", "#151515", "#222222", "#1A1A1A", "#1B3B26", "#30FFFFFF", "#FF375F", "#9160FF", "#279DFF", "#E7BE54", "#56DE9A" },
+            // Glass: tinted transparency without fading the content.
+            new[] { "#0B1420", "#F5F8FC", "#C1CBD8", "#8FD8E8", "#172432", "#3D5268", "#1D2B3C", "#284855", "#558AC9DB", "#F1A8BE", "#C0B9EC", "#9DCBE9", "#E3CB99", "#A2D8C6" },
             // 1: Shinkai Twilight
             new[] { "#090F1C", "#EDF2FC", "#A9B5CF", "#F19EBB", "#152033", "#2C3A50", "#19253B", "#3B2940", "#344F729D", "#F19EBB", "#B6B8F1", "#8DAFE8", "#EAC993", "#AACFC5" },
             // 2: Sakura Shrine
@@ -47,7 +50,7 @@ namespace DeskPill
         };
 
         // Top atmospheric sheen for the notch shell (top color -> bottom color)
-        static readonly string[] TopTintHex = { "#000000", "#111B2C", "#21141D", "#101A29", "#1A2417", "#1C1429", "#271912", "#1E1931", "#121927" };
+        static readonly string[] TopTintHex = { "#000000", "#314456", "#111B2C", "#21141D", "#101A29", "#1A2417", "#1C1429", "#271912", "#1E1931", "#121927" };
 
         sealed class Tone : DependencyObject
         {
@@ -66,6 +69,7 @@ namespace DeskPill
         static readonly GradientStop shellBottomStop = new GradientStop((Color)ColorConverter.ConvertFromString(Colors[0][0]), 1.0);
         static readonly LinearGradientBrush shellGradient = CreateShellGradient();
         static int selected;
+        static int glassOpacity=72, glassHighlight=35;
 
         static LinearGradientBrush CreateShellGradient()
         {
@@ -133,7 +137,9 @@ namespace DeskPill
                 c.A = 135;
                 return c;
             }
-            return (Color)ColorConverter.ConvertFromString(index < 0 ? key : Colors[selected][index]);
+            var resolved=(Color)ColorConverter.ConvertFromString(index < 0 ? key : Colors[selected][index]);
+            if(Current=="Glass" && (index==4 || index==6 || index==7))resolved.A=(byte)Math.Min(245,glassOpacity*255/100+30);
+            return resolved;
         }
 
         public static Brush Brush(string key)
@@ -149,6 +155,7 @@ namespace DeskPill
         }
         public static void ConfigureCustom(Settings settings)
         {
+            glassOpacity=Math.Max(35,Math.Min(95,settings.GlassOpacity));glassHighlight=Math.Max(0,Math.Min(80,settings.GlassHighlight));
             int i = Names.Length - 1;
             var shell = (Color)ColorConverter.ConvertFromString(Settings.ColorOrDefault(settings.CustomShell,"#0C111B"));
             var surface = (Color)ColorConverter.ConvertFromString(Settings.ColorOrDefault(settings.CustomSurface,"#1A2332"));
@@ -164,6 +171,13 @@ namespace DeskPill
             selected = Array.IndexOf(Names, Normalize(name));
             shellTopStop.Color = (Color)ColorConverter.ConvertFromString(TopTintHex[selected]);
             shellBottomStop.Color = (Color)ColorConverter.ConvertFromString(Colors[selected][0]);
+            if(Current=="Glass")
+            {
+                Color top=Mix((Color)ColorConverter.ConvertFromString("#0B1420"),System.Windows.Media.Colors.White,glassHighlight/200.0);
+                top.A=(byte)(Math.Min(98,glassOpacity+glassHighlight/10.0)*255/100);
+                Color bottom=(Color)ColorConverter.ConvertFromString("#0B1420");bottom.A=(byte)(glassOpacity*255/100);
+                shellTopStop.Color=top;shellBottomStop.Color=bottom;
+            }
             foreach (var pair in brushes) pair.Value.Color = Resolve(pair.Key);
         }
 

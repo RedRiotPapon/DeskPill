@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
@@ -672,6 +672,13 @@ namespace DeskPill
         struct PointStruct
         {
             public int X, Y;
+        }
+
+        public static void SetClickThrough(IntPtr window,bool enabled)
+        {
+            if(window==IntPtr.Zero)return;
+            if(IntPtr.Size==8){long style=GetWindowLong64(window,-20).ToInt64();SetWindowLong64(window,-20,new IntPtr(enabled?style|0x20L:style&~0x20L));}
+            else {int style=GetWindowLong32(window,-20);SetWindowLong32(window,-20,enabled?style|0x20:style&~0x20);}
         }
 
         public static void SetToolWindow(IntPtr hwnd)

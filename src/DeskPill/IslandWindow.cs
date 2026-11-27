@@ -20,7 +20,9 @@ namespace DeskPill
 {
     public sealed class IslandWindow : Window
     {
-        const double HoverOpenDelayMs = 110, HoverOptionsDelayMs = 130;
+        Settings preferencesPreview;
+        int motionDemoRevision;
+        Settings MotionPreferences {get{return preferencesPreview??state.Settings;}}
         const double ExpandedWidthClassic = 396.0;
         const double ExpandedWidthFloating = 380.0;
         const double ExpandedOffsetX = (IslandMotion.CanvasWidth - ExpandedWidthClassic) * 0.5;
@@ -43,6 +45,8 @@ namespace DeskPill
         DesktopNotification currentNotification;
         bool notificationLaunching;
         DictationController dictation;
+        bool gameModeActive,gamePolling;uint gamePid;
+        PresentMonCapture gameCapture;
         internal bool RuntimeProbeMode { get; set; }
         Border notificationCard;
         readonly DispatcherTimer heartbeat = new DispatcherTimer(), closeTimer = new DispatcherTimer(), hoverTimer = new DispatcherTimer(), hudTimer = new DispatcherTimer(), tabWatchTimer = new DispatcherTimer();
@@ -213,6 +217,7 @@ namespace DeskPill
             Ui.MotionEnabled = !capture && !state.Settings.FastAnimations;
 
             motion = new IslandMotion(shell, rim, contentHost, OnMotionFrame);
+            motion.TimeScale=state.Settings.MotionPace/100.0;
             focus = new FocusClock(state.Settings);
             focus.RestoreFrom(state, DateTime.UtcNow);
             waterReminder = DateTime.Now.AddMinutes(state.Settings.ReminderMinutes);
@@ -373,11 +378,11 @@ namespace DeskPill
                 }
             };
 
-            closeTimer.Interval = TimeSpan.FromMilliseconds(360);
+            closeTimer.Interval = TimeSpan.FromMilliseconds(MotionPreferences.HoverCloseMs);
             closeTimer.Tick += delegate
             {
                 closeTimer.Stop();
-                closeTimer.Interval = TimeSpan.FromMilliseconds(360);
+                closeTimer.Interval = TimeSpan.FromMilliseconds(MotionPreferences.HoverCloseMs);
                 if (CanAutoClose() && !IsCursorInsideNotch(12))
                     SetOpen(false);
             };
@@ -425,6 +430,7 @@ namespace DeskPill
                     return;
                 }
 
+                if(!preview && state.Settings.GameOverlay)await PollGameMode();
                 if (!preview) {dictation=new DictationController(this,state.Settings,Notify,delegate {if(pose==NotchPose.NotificationPeek)DismissNotification();SetOpen(false);});dictation.Configure();}
                 SetupTray();
                 lastVolume = SystemService.GetVolume();
@@ -685,7 +691,7 @@ namespace DeskPill
         {
             get
             {
-                return state.Settings.Style == "Floating" || preview;
+                return gameModeActive || state.Settings.Style == "Floating" || preview;
             }
         }
 
@@ -702,7 +708,7 @@ namespace DeskPill
 
         NotchPose RestingClosedPose()
         {
-            return (state.Settings.MinimalNotch || tabOverlapping) ? NotchPose.Tiny : NotchPose.Compact;
+            return !gameModeActive && (state.Settings.MinimalNotch || tabOverlapping) ? NotchPose.Tiny : NotchPose.Compact;
         }
 
         void TargetDimensions(NotchPose targetPose, out double w, out double h, out bool showDock, out bool showHud)
@@ -852,7 +858,7 @@ namespace DeskPill
         bool overlapPolling;
         async void PollTabOverlap()
         {
-            if (capture || preview || SuppressCursorWatch || !IsLoaded || !IsVisible || overlapPolling)
+            if (gameModeActive || capture || preview || SuppressCursorWatch || !IsLoaded || !IsVisible || overlapPolling)
                 return;
 
             bool detected = false;
@@ -960,7 +966,7 @@ namespace DeskPill
 
         void ProcessPointer(double x, double y, DateTime now)
         {
-            if(dictation!=null && dictation.Active)return;
+            if(gameModeActive || (dictation!=null && dictation.Active))return;
             bool inside = PointerBounds(open ? 12.0 : 0.0).Contains(x, y);
             if (pose == NotchPose.NotificationPeek)
             {
@@ -974,7 +980,7 @@ namespace DeskPill
                 if (inside)
                 {
                     closeTimer.Stop();
-                    closeTimer.Interval = TimeSpan.FromMilliseconds(360);
+                    closeTimer.Interval = TimeSpan.FromMilliseconds(MotionPreferences.HoverCloseMs);
                     double relY = y - motion.TopOffset;
                     bool dockZone = !dragHovering && !IsInlinePose(pose)
                         && relY >= 152 && relY <= 194 && Math.Abs(x - IslandMotion.CanvasWidth * 0.5) <= 98;
@@ -985,7 +991,7 @@ namespace DeskPill
                     else if (dockZone)
                     {
                         if (dockIntentSince == DateTime.MinValue) dockIntentSince = now;
-                        if ((now - dockIntentSince).TotalMilliseconds >= HoverOptionsDelayMs) SetPose(NotchPose.OptionsDock);
+                        if ((now - dockIntentSince).TotalMilliseconds >= MotionPreferences.HoverOptionsMs) SetPose(NotchPose.OptionsDock);
                     }
                     else dockIntentSince = DateTime.MinValue;
                 }
@@ -1009,7 +1015,7 @@ namespace DeskPill
                 else if (!hoverBlockedUntilExit && state.Settings.OpenMode == "Hover")
                 {
                     if (hoverIntentSince == DateTime.MinValue) hoverIntentSince = now;
-                    if ((now - hoverIntentSince).TotalMilliseconds >= HoverOpenDelayMs)
+                    if ((now - hoverIntentSince).TotalMilliseconds >= MotionPreferences.HoverOpenMs)
                     {
                         closeTimer.Stop();
                         hudTimer.Stop();
@@ -1176,6 +1182,7 @@ namespace DeskPill
 
         void SetOpen(bool value)
         {
+            if(value && gameModeActive){SetGameMode(new GameWindow());if(!IsVisible && IsLoaded)Show();}
             if (open == value)
             {
                 if (value && IsLoaded && !IsVisible)
@@ -1411,6 +1418,7 @@ namespace DeskPill
             if (pose == NotchPose.NotificationPeek) return;
             double clamped = Math.Max(0.0, Math.Min(1.0, targetRatio));
             string finalText = string.IsNullOrEmpty(suffix) ? "" : ((int)Math.Round(clamped * 100.0)) + suffix;
+            if (gameModeActive)return;
             if (!state.Settings.ShowHudPopups || open || dragHovering)
             {
                 if (open)
@@ -1447,6 +1455,7 @@ namespace DeskPill
             if (hudIcon == null)
                 return;
             if (pose == NotchPose.NotificationPeek) return;
+            if (gameModeActive)return;
             if (!state.Settings.ShowHudPopups || open || dragHovering)
             {
                 if (open)
@@ -1513,7 +1522,7 @@ namespace DeskPill
                 if (state.Settings.FullscreenNotifications == "History only") notificationHistory.ClearPending();
                 return;
             }
-            if (open || dragHovering || contextMenuOpen || !IsVisible || pose == NotchPose.NotificationPeek || clipboardPalette != null || historyWindow != null || settingsWindow != null || (dictation!=null && dictation.Active) || notificationLaunching) return;
+            if (gameModeActive || open || dragHovering || contextMenuOpen || !IsVisible || pose == NotchPose.NotificationPeek || clipboardPalette != null || historyWindow != null || settingsWindow != null || (dictation!=null && dictation.Active) || notificationLaunching) return;
             var next = notificationHistory.Take(state.Settings,focus.Running && focus.Phase == "Focus");
             if (next != null) ShowNotification(next);
         }
@@ -1667,6 +1676,7 @@ namespace DeskPill
 
             compact.MouseLeftButtonUp += delegate
             {
+                if(gameModeActive)return;
                 pinned = state.Settings.OpenMode == "Click";
                 SyncDockStates();
                 SetOpen(true);
@@ -2960,9 +2970,10 @@ namespace DeskPill
             var now = DateTime.Now;
             double progress = state.Settings.StatusRing == "Tasks" ? (state.Tasks.Count == 0 ? 0 : (double)state.Tasks.Count(t => t.Done) / state.Tasks.Count) : state.Settings.StatusRing == "Battery" ? Math.Max(0, SystemService.BatteryPercent()) / 100.0 : state.Settings.StatusRing == "None" ? 0 : state.Settings.StatusRing == "Focus" ? 1 - focus.Remaining(DateTime.UtcNow).TotalMinutes / (focus.Phase == "Focus" ? state.Settings.FocusMinutes : focus.Phase == "Short break" ? state.Settings.ShortBreakMinutes : state.Settings.LongBreakMinutes) : (double)state.WaterMl / state.Settings.WaterGoalMl;
 
-            string sourceName = state.Settings.StatusRing;
-            string glyph = sourceName == "Tasks" ? "\uE73E" : sourceName == "Battery" ? "\uE83F" : sourceName == "Focus" ? "\uE916" : "\uEB42";
-            Brush accent = sourceName == "Tasks" ? PageAccent("Tasks") : sourceName == "Focus" ? PageAccent("Focus") : sourceName == "Battery" ? Ui.Green : Ui.Hex("#379CF8");
+            if(gameModeActive)progress=0;
+            string sourceName = gameModeActive?"Game":state.Settings.StatusRing;
+            string glyph = sourceName == "Game" ? "\uE7FC" : sourceName == "Tasks" ? "\uE73E" : sourceName == "Battery" ? "\uE83F" : sourceName == "Focus" ? "\uE916" : "\uEB42";
+            Brush accent = sourceName == "Game" ? Ui.Hex("#8FD8E8") : sourceName == "Tasks" ? PageAccent("Tasks") : sourceName == "Focus" ? PageAccent("Focus") : sourceName == "Battery" ? Ui.Green : Ui.Hex("#379CF8");
             foreach (var ring in new[] { compactRing, expandedRing })
             {
                 if (ring == null) continue;
@@ -2970,26 +2981,27 @@ namespace DeskPill
                 ring.IconGlyph = glyph;
                 if(!object.ReferenceEquals(ring.Accent,accent)){ring.Accent=accent;ring.InvalidateVisual();}
                 ring.Progress = progress;
-                ring.ToolTip = sourceName + " · " + (Math.Max(0, Math.Min(1, progress))*100).ToString("0") + "%";
+                ring.ToolTip = gameModeActive?(gameCapture==null?"Game glass":gameCapture.Status):sourceName + " · " + (Math.Max(0, Math.Min(1, progress))*100).ToString("0") + "%";
             }
 
-            bool isPlaying = media.Current.Playing;
+            bool isPlaying = media.Current.Playing && !gameModeActive;
             if (compactEq != null)
                 compactEq.Playing = isPlaying;
             if (expandedEq != null)
                 expandedEq.Playing = isPlaying;
 
-            bool showMascot = !isPlaying && state.Settings.ShowMascot;
+            bool showMascot = !gameModeActive && !isPlaying && state.Settings.ShowMascot;
             if (compactMascot != null && compactEq != null)
             {
                 compactMascot.Visibility = showMascot ? Visibility.Visible : Visibility.Collapsed;
-                compactEq.Visibility = showMascot ? Visibility.Collapsed : Visibility.Visible;
+                compactEq.Visibility = gameModeActive || showMascot ? Visibility.Collapsed : Visibility.Visible;
                 compactMascot.SetActive(!open && pose == NotchPose.Compact && showMascot && IsVisible && !capture);
             }
 
             if (compactText != null)
             {
-                if (now < toastUntil)
+                if(gameModeActive){double? fps=gameCapture==null?(double?)null:gameCapture.Fps;compactText.Text=fps.HasValue?fps.Value.ToString("0")+" FPS":"FPS —";compactText.ToolTip=gameCapture==null?"Game glass":gameCapture.Status;}
+                else if (now < toastUntil)
                     compactText.Text = toast;
                 else if (focus.Running)
                     compactText.Text = FormatTime(focus.Remaining(DateTime.UtcNow));
@@ -3070,6 +3082,8 @@ namespace DeskPill
             if (stopping)
                 return;
             ticks++;
+            await PollGameMode();
+            if(stopping)return;
             string date = state.WaterDate;
             state.Normalize(DateTime.Now);
             if (date != state.WaterDate)
@@ -3141,7 +3155,7 @@ namespace DeskPill
                 await RefreshMedia();
             if (ticks % 3 == 0)
             {
-                bool hide = state.Settings.HideFullscreen && !preview && NativeMethods.IsForegroundFullscreen(hwnd);
+                bool hide = !gameModeActive && state.Settings.HideFullscreen && !preview && NativeMethods.IsForegroundFullscreen(hwnd);
                 if (hide && IsVisible)
                     Hide();
                 else if (!hide && !IsVisible)
@@ -3256,6 +3270,7 @@ namespace DeskPill
 
         void ShowSettings()
         {
+            SetGameMode(new GameWindow());
             if(dictation!=null && dictation.Active)dictation.Cancel();
             closeTimer.Stop();
             if (settingsWindow != null)
@@ -3267,6 +3282,8 @@ namespace DeskPill
             int previousFocus = state.Settings.FocusMinutes;
             settingsWindow = new SettingsWindow(state, delegate
             {
+                preferencesPreview=null;
+                motion.TimeScale=state.Settings.MotionPace/100.0;
                 Ui.MotionEnabled = !capture && !state.Settings.FastAnimations;
                 state.Normalize(DateTime.Now);
                 ApplyTheme();
@@ -3283,10 +3300,47 @@ namespace DeskPill
                 ContextMenu=BuildMenu();
                 if(dictation!=null)dictation.Configure();
                 if (pose == NotchPose.NotificationPeek && (currentNotification == null || !NotificationHistory.Allowed(currentNotification,state.Settings,focus.Running && focus.Phase == "Focus"))) DismissNotification();
-            }, Notify, ApplyTheme, notificationHistory.Items);
+            }, Notify, ApplyTheme, notificationHistory.Items, PreviewPreferences);
             settingsWindow.Closed += delegate { settingsWindow = null; };
             settingsWindow.Show();
             settingsWindow.Activate();
+        }
+
+        async Task PollGameMode()
+        {
+            if(capture||preview||gamePolling||settingsWindow!=null||IsInlinePose(pose))return;
+            if(!state.Settings.GameOverlay){if(gameModeActive)SetGameMode(new GameWindow());return;}
+            gamePolling=true;
+            try{var snapshot=await Task.Run(()=>GameWindow.Read(state.Settings));if(!stopping && state.Settings.GameOverlay && settingsWindow==null && snapshot.ProcessId==GameWindow.ForegroundPid)SetGameMode(snapshot);}
+            finally{gamePolling=false;}
+        }
+        void SetGameMode(GameWindow game)
+        {
+            bool active=game.Matches;
+            if(active==gameModeActive && (!active||gamePid==game.ProcessId))return;
+            if(gameCapture!=null){gameCapture.Dispose();gameCapture=null;}
+            gameModeActive=active;gamePid=active?game.ProcessId:0;
+            NativeMethods.SetClickThrough(hwnd,active);
+            if(active)
+            {
+                tabOverlapping=false;hudTimer.Stop();currentNotification=null;
+                if(notificationCard!=null){hudLayer.Children.Remove(notificationCard);notificationCard=null;}
+                SetOpen(false);pose=NotchPose.Compact;
+                Themes.ConfigureCustom(state.Settings);ApplyTheme("Glass");
+                if(!capture&&!preview)gameCapture=new PresentMonCapture(game.ProcessId);
+                if(!IsVisible && IsLoaded)Show();
+            }
+            else ApplyTheme();
+            Place();SnapPoseImmediate();UpdateValues();
+            if(!active && !capture && !preview && state.Settings.HideFullscreen && NativeMethods.IsForegroundFullscreen(hwnd) && IsVisible)Hide();
+        }
+
+        async void PreviewPreferences(Settings settings, bool demonstrate)
+        {
+            int revision=++motionDemoRevision;
+            preferencesPreview=settings;motion.TimeScale=settings.MotionPace/100.0;
+            closeTimer.Interval=TimeSpan.FromMilliseconds(settings.HoverCloseMs);
+            if(demonstrate){SetOpen(false);await Task.Delay(180);if(settingsWindow!=null && revision==motionDemoRevision)SetOpen(true);}
         }
 
         async void StartOcr()
@@ -3427,6 +3481,8 @@ namespace DeskPill
 
         void Cleanup()
         {
+            if(gameCapture!=null){try{gameCapture.StopAsync().Wait(2000);}catch(AggregateException){}gameCapture=null;}
+            NativeMethods.SetClickThrough(hwnd,false);
             if(dictation!=null){dictation.Dispose();dictation=null;}
             ClearOutgoingPage();
             hoverTimer.Stop();

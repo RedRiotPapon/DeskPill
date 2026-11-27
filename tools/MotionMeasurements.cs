@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -16,6 +16,7 @@ using Forms = System.Windows.Forms;
 
 class MotionMeasurements
 {
+    static string themeName="Ghibli Meadow";
     static readonly BindingFlags F = BindingFlags.Instance | BindingFlags.NonPublic;
     static object Field(object value, string name)
     {
@@ -54,7 +55,7 @@ class MotionMeasurements
     static async Task<object> Measure(Forms.Screen screen, string directory)
     {
         var state = new AppState();
-        state.Settings.Theme = "Ghibli Meadow";
+        state.Settings.Theme = themeName;
         state.Settings.Monitor = screen.DeviceName;
         state.Settings.MirrorNotifications = false;
         state.Settings.ClipboardEnabled = false;
@@ -202,6 +203,7 @@ class MotionMeasurements
         string output = args.Length > 0 ? Path.GetFullPath(args[0]) : Path.GetFullPath("artifacts/motion-measurement.json");
         Directory.CreateDirectory(Path.GetDirectoryName(output));
         int code = 0;
+        if(args.Length>1)themeName=Settings.NormalizeTheme(args[1]);
         var app = new Application
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown
@@ -217,6 +219,7 @@ class MotionMeasurements
                 var report = new
                 {
                     measuredAtUtc = DateTime.UtcNow.ToString("o"),
+                    theme = themeName,
                     metric = "WPF CompositionTarget.Rendering callback intervals, isolated transitions",
                     renderTier = RenderCapability.Tier >> 16,
                     windowsAnimations = SystemParameters.ClientAreaAnimation,

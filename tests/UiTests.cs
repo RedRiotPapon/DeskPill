@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
@@ -90,7 +90,7 @@ class UiTests
         {
             Click(w,"Appearance"); ColorInput(w,"Shell").Text="#132021"; ColorInput(w,"Accent").Text="#E9C46A";
             Click(w,"Matte");
-            Controls<Slider>(w).Single().Value=31; Click(w,"Save changes");
+            Controls<Slider>(w).Single(x=>Convert.ToString(x.Tag)=="CustomOutline").Value=31; Click(w,"Save changes");
         });
         Check(calls==1 && state.Settings.Theme=="Custom" && state.Settings.CustomShell=="#132021" && state.Settings.CustomFinish=="Matte" && state.Settings.CustomOutline==31 && Themes.Current=="Custom","Custom settings did not commit");
         Themes.ConfigureCustom(new Settings()); Themes.Apply("Classic");

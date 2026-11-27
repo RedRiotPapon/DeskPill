@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using DeskPill;
 
@@ -91,7 +91,7 @@ class DomainTests
                 store.Save(a);
                 var b = store.Load();
                 Check(b.Tasks.Count == 1 && b.Tasks[0].Title == "Keep me" && b.Shelf.Count == 1, "task and shelf JSON roundtrip");
-                Check(Settings.ThemeNames.Length == 9, "Classic, seven skins and Custom registered");
+                Check(Settings.ThemeNames.Length == 10 && Settings.ThemeNames[0]=="Classic" && Settings.ThemeNames[1]=="Glass", "Classic stays default, followed by Glass, seven skins and Custom");
                 Check(Settings.NormalizeTheme("Matcha") == "Ghibli Meadow" && Settings.NormalizeTheme("Sakura Dawn") == "Sakura Shrine", "previous palette preferences migrate to refined skins");
                 a.Settings.Theme = "Sakura Shrine";
                 store.Save(a);
@@ -103,6 +103,8 @@ class DomainTests
                 Check(custom.Theme == "Custom" && custom.CustomShell == "#101820" && custom.CustomAccent == "#E9C46A" && custom.CustomFinish == "Matte" && custom.CustomOutline == 37, "custom palette and surface options persist");
                 a.Settings.CustomShell = "bad"; a.Settings.CustomText = null; a.Settings.CustomOutline = 100; a.Settings.CustomFinish = "unknown"; a.Normalize(DateTime.Now);
                 Check(a.Settings.CustomShell == "#0C111B" && a.Settings.CustomText == "#F3F6FC" && a.Settings.CustomOutline == 60 && a.Settings.CustomFinish == "Satin", "invalid custom appearance repairs safely");
+                a.Settings.HoverOpenMs=0;a.Settings.MotionPace=85;a.Settings.GlassOpacity=61;a.Settings.GameOverlay=true;a.Settings.GameApps=new[]{"fixture.exe"};store.Save(a);var profile=store.Load().Settings;
+                Check(profile.CustomizationVersion==1 && profile.HoverOpenMs==0 && profile.MotionPace==85 && profile.GlassOpacity==61 && profile.GameOverlay && profile.GameApps[0]=="fixture.exe","A custom motion, glass and game profile survives restart including zero delay");
                 a.Settings.KeepClipboard = true;
                 store.Save(a);
                 Check(store.Load().Clipboard.Count == 1, "clipboard opt in persists");
@@ -141,6 +143,11 @@ class DomainTests
             Check(visibility.Settings.VisiblePages().Length==1 && visibility.Settings.VisiblePages()[0]=="Music","malformed all-hidden state retains one page");
             visibility.Settings.NotificationSeconds=90;visibility.Settings.MutedNotificationApps=new[]{"APP","app",""};visibility.Normalize(DateTime.Now);
             Check(visibility.Settings.NotificationSeconds==15 && visibility.Settings.MutedNotificationApps.Length==1,"notification controls normalize safely");
+            var tuning=new AppState();tuning.Settings.CustomizationVersion=0;tuning.Settings.MotionPace=0;tuning.Normalize(DateTime.Now);
+            Check(tuning.Settings.HoverOpenMs==110 && tuning.Settings.HoverCloseMs==360 && tuning.Settings.MotionPace==100 && tuning.Settings.GlassOpacity==72,"Older installs receive safe motion and glass defaults");
+            tuning.Settings.HoverOpenMs=-20;tuning.Settings.HoverOptionsMs=900;tuning.Settings.HoverCloseMs=20;tuning.Settings.MotionPace=500;tuning.Settings.GlassOpacity=0;tuning.Settings.GlassHighlight=900;tuning.Settings.GameApps=new[]{"game.exe","GAME.exe","../bad.exe","x.txt"};tuning.Normalize(DateTime.Now);
+            Check(tuning.Settings.HoverOpenMs==0 && tuning.Settings.HoverOptionsMs==600 && tuning.Settings.HoverCloseMs==150 && tuning.Settings.MotionPace==130 && tuning.Settings.GlassOpacity==35 && tuning.Settings.GlassHighlight==80 && tuning.Settings.GameApps.Length==1,"Motion, glass and game preferences repair unsafe ranges");
+            Check(!new Settings().GameOverlay && new Settings().Theme=="Classic","Game mode stays opt-in and Classic stays default");
             var clips=new[]{" First line\nSecond line ","project alpha","PROJECT beta","project alpha"};
             Check(ClipboardSearch.Find(clips," PROJECT ").Length==2 && ClipboardSearch.Find(clips,"second")[0]==clips[0],"clipboard search ignores query case and preserves full paste text");
             Check(ClipboardSearch.Find(clips,"missing").Length==0,"clipboard search handles no results");

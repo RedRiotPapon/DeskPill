@@ -9,3 +9,7 @@ English model: vosk-model-small-en-us-0.15, listed under Apache License 2.0 by t
 Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0
 
 Downloads are version-pinned and checked against SHA-256 digests before extraction. Recognition runs locally; audio is sent only to DeskPill's own worker over an anonymous process pipe, not to a network service.
+
+## Optional FPS component
+
+PresentMon 2.6.0 is downloaded from Intel GameTechDev’s official GitHub release only when the user installs the FPS component. It is checked against a pinned SHA-256 digest. PresentMon is MIT licensed, Copyright (C) 2017–2024 Intel Corporation. Its full license is installed beside the downloaded executable. Source and license: https://github.com/GameTechDev/PresentMon and https://github.com/GameTechDev/PresentMon/blob/main/LICENSE.txt.
