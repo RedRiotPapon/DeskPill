@@ -603,7 +603,12 @@ namespace DeskPill
             gameModeItem.Click += delegate {Dispatcher.BeginInvoke(new Action(ToggleGameMode));};
             menu.Opening += delegate {gameModeItem.Checked=state.Settings.GameOverlay;};
             menu.Items.Add(gameModeItem);
-            menu.Items.Add("Dictation (hold Win+Space, optional)", null, delegate { Dispatcher.BeginInvoke(new Action(delegate {if(dictation!=null)dictation.Toggle();})); });
+            var dictationEnabledItem=new Forms.ToolStripMenuItem("Enable dictation · Win+Space");
+            dictationEnabledItem.Click+=delegate{Dispatcher.BeginInvoke(new Action(delegate{SetDictationEnabled(!state.Settings.DictationEnabled);}));};
+            var dictateNowItem=new Forms.ToolStripMenuItem("Start / stop dictation");
+            dictateNowItem.Click+=delegate{Dispatcher.BeginInvoke(new Action(delegate{if(dictation!=null)dictation.Toggle();}));};
+            menu.Opening+=delegate{dictationEnabledItem.Checked=state.Settings.DictationEnabled;dictateNowItem.Enabled=state.Settings.DictationEnabled&&SpeechAssets.Ready;};
+            menu.Items.Add(dictationEnabledItem);menu.Items.Add(dictateNowItem);
             menu.Items.Add("Clipboard palette", null, delegate { Dispatcher.BeginInvoke(new Action(ShowClipboardPalette)); });
             menu.Items.Add("Recent notifications", null, delegate { Dispatcher.BeginInvoke(new Action(ShowRecentNotifications)); });
             menu.Items.Add("Exit DeskPill", null, delegate

@@ -41,6 +41,9 @@ class InteractionTests {
  }
  [STAThread] static int Main() {
   var app=new Application {ShutdownMode=ShutdownMode.OnExplicitShutdown};Ui.Init(app);System.Threading.SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(app.Dispatcher));
+  Test("Explicit dictation opt-in persists and can be disabled without starting the microphone",delegate {
+   var w=Island();try{var state=(AppState)Field(w,"state");Check(!state.Settings.DictationEnabled,"Dictation started enabled");var method=w.GetType().GetMethod("SetDictationEnabled",Private);Check(method!=null,"No explicit tray enable path exists");if(SpeechAssets.Ready){method.Invoke(w,new object[]{true});Check(state.Settings.DictationEnabled&&Field(w,"dictation")==null,"Enabling starts microphone or fails to update preference");method.Invoke(w,new object[]{false});Check(!state.Settings.DictationEnabled,"Disabling failed");}}finally{Call(w,"Cleanup");}
+  });
   Test("Regular users never initialize agent services from housekeeping",delegate {
    var w=Island();try{Call(w,"TrackAgentContext");Call(w,"ObserveAgentTransitions");Check(Field(w,"agentHub")==null&&Field(w,"agentScreenTarget")==null&&Field(w,"agentSpeech")==null,"Agent housekeeping activated without a connection");}finally{Call(w,"Cleanup");}
   });
