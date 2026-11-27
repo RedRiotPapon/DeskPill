@@ -578,6 +578,7 @@ namespace DeskPill
         StackPanel Dictation()
         {
             var p=Page("Dictation", "English speech to text, privately on your PC. Optional and off by default.");
+            Check(p,"Click to start and stop agent dictation (hold by default)","AgentVoiceToggle");
             Check(p,"Enable English dictation · Win+Space","DictationEnabled");
             Note(p,"Hold Win+Space while speaking; release to insert. The microphone waveform appears inside the notch. Esc cancels. While enabled, this replaces Windows’ Win+Space language switch. Disabling restores it.");
             Note(p,"Install the English speech pack once (about 54 MB download). Recognition runs on-device in a separate worker, which exits after each transcription to release its model memory. No microphone access while idle. Recordings are limited to 90 seconds.");
@@ -654,9 +655,12 @@ namespace DeskPill
             pageList.SelectedIndex = j;
         }
 
+        internal void OpenSection(string name){var item=navigation.FirstOrDefault(b=>Convert.ToString(b.Content)==name);if(item!=null)item.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));}
+
         StackPanel NotificationOptions(IEnumerable<DesktopNotification> known)
         {
             var p=Page("Notifications","Quiet controls for new arrivals. Recent notifications stay in memory until you clear them or close DeskPill.");
+            Check(p,"Quiet agent completion previews","AgentCompletionPeeks");
             Number(p,"Peek duration (seconds)","NotificationSeconds",2,15);
             Choice(p,"During focus sessions","FocusNotifications",new[]{"History only","Allow peeks"});
             Choice(p,"During fullscreen apps","FullscreenNotifications",new[]{"History only","After fullscreen"});

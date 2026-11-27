@@ -11,6 +11,19 @@ using System.Windows.Threading;
 
 namespace DeskPill
 {
+    // Keep the two destinations exclusive, including refused starts in the agent view.
+    internal static class DictationRouting
+    {
+        public static void Begin(Func<bool> agentBegin, Action ordinaryBegin)
+        {
+            if (!agentBegin()) ordinaryBegin();
+        }
+        public static void End(bool agentActive, Action agentEnd, Action ordinaryEnd)
+        {
+            if (agentActive) agentEnd(); else ordinaryEnd();
+        }
+    }
+
     sealed class DictationKeys : IDisposable
     {
         delegate IntPtr Hook(int code, IntPtr message, IntPtr data);
@@ -399,14 +412,14 @@ namespace DeskPill
             {
                 keys = new DictationKeys(delegate
                 {
-                    owner.Dispatcher.BeginInvoke(new Action(Begin));
+                    owner.Dispatcher.BeginInvoke(new Action(delegate { DictationRouting.Begin(owner.TryBeginAgentDictation, Begin); }));
                 }, delegate
                 {
-                    owner.Dispatcher.BeginInvoke(new Action(Finish));
+                    owner.Dispatcher.BeginInvoke(new Action(delegate { DictationRouting.End(owner.AgentVoiceActive, owner.FinishAgentDictation, Finish); }));
                 }, delegate
                 {
-                    owner.Dispatcher.BeginInvoke(new Action(Cancel));
-                }, () => Active);
+                    owner.Dispatcher.BeginInvoke(new Action(delegate { DictationRouting.End(owner.AgentVoiceActive, owner.CancelAgentDictation, Cancel); }));
+                }, () => Active || owner.AgentVoiceActive);
             }
             catch (Exception e)
             {

@@ -55,13 +55,21 @@ Use **Recent notifications** in the tray or right-click menu to review arrivals.
 
 **Agents** is visible by default, including after upgrading. Use **Settings → Pages** to hide, restore or reorder it; hiding keeps your connections. Music and everyday tools work without setting up an agent.
 
-Choose **Connect agent**, name the connection, pick its installed tool and project folder, then open its conversation. Codex CLI, Claude Code and Gemini CLI adapters run separate sessions owned by DeskPill. Follow up in the same session, switch destinations without losing drafts, and use **Stop** to end that run. The home page’s manage menu offers edit, remove and new conversation. A quiet dot on the compact notch shows working or attention states while Agents is visible; game mode suppresses it.
+Choose **Connect agent**, name the connection, pick its installed tool and project folder, then choose **Ask your agent…** or the microphone. Codex CLI, Claude Code and Gemini CLI adapters run separate sessions owned by DeskPill. Follow up in the same session, switch destinations without losing drafts, and use **Stop** to end that run. The home page’s manage menu offers edit, remove and new conversation. A quiet dot on the compact notch shows working, unread or attention states while Agents is visible; game mode suppresses it.
 
-Connections default to **Review only**. Codex project edits require an explicit connection setting. Tools use their existing sign-in and billing. Install and authenticate your CLI separately; automatic detection supports native `.exe` installations. Node/npm `.cmd` shims are not currently supported. Gemini plan mode depends on the installed CLI’s capabilities.
+Connections default to **Review only**. Codex project edits require an explicit connection setting. Tools use their existing sign-in and billing. Install and authenticate your CLI separately; **Find installed CLI** supports native `.exe` tools and recognized official npm installations without executing batch shims. Gemini plan mode depends on the installed CLI’s capabilities.
 
 For Antigravity, desktop/cloud tools or another agent without a supported connection, choose **App shortcut**. DeskPill offers **Copy prompt** and **Open app** for manual handoff. It does not discover or control that app’s existing conversations.
 
 With the optional English speech pack installed, **hold the microphone button** (or focus it and hold Space), speak, and release to fill the draft. The waveform follows microphone input. Review your words, then click **Send** or press **Ctrl+Enter**. Esc cancels speech; another Esc returns to the page. Voice never dispatches a prompt automatically. Drafts and responses stay in memory and clear when DeskPill exits; connection profiles are saved locally. Provider tools may keep their own history. [Connection details and limits](docs/AGENTS.md).
+
+The conversation retains a bounded in-memory transcript. Use its **Conversation actions** gear to copy the latest answer, copy the conversation, start over, or explicitly paste the answer into the remembered source app. Paste checks the original window and process; if Windows refuses, the answer remains copied. It never presses Enter. Idle conversations can collapse while the tool keeps working; reopening preserves each agent’s draft.
+
+For **Codex CLI**, the camera button attaches one reviewed screen image: select an area, the previous external window, or its monitor. A thumbnail shows the source, capture time and recipient. Click it to inspect or × to remove. The image goes to the selected tool only when you click **Send**. Window captures contain visible pixels and may include overlapping windows. Attachments remain separate per connection; successful sends and removal clean temporary files, while failed sends keep the draft available for retry. Provider history is managed by that provider.
+
+Hold-to-talk stays the default. Right-click the mic or visit **Settings → Dictation** for click-to-start/stop. Enabled **Win+Space** fills the open agent draft for review; elsewhere it keeps normal dictation behavior. Missing speech assets open the optional setup page. Neither voice nor screenshots send themselves.
+
+Agent completions can show a brief, silent clickable notice when the notch is idle. **Settings → Notifications** can disable these. Focus quiet settings, fullscreen, games, overlap and active editors suppress them; the status dot remains available when appropriate. No agent discovery, agent process, microphone or capture starts for ordinary users without an explicit connection or action.
 
 ## Music shortcuts
 
@@ -100,7 +108,7 @@ You need Windows, .NET Framework 4.8 and Windows SDK metadata (`Windows.winmd`).
 ```powershell
 .\build.ps1            # Compile to bin/DeskPill.exe
 .\build.ps1 -Test      # Build and run all test suites
-.\package.ps1          # Create dist/DeskPill-2.0.2-portable.zip
+.\package.ps1          # Create dist/DeskPill-2.1.0-portable.zip
 ```
 
 The solution is also available as `DeskPill.sln`. Full UI, media and OCR probes require an interactive Windows desktop; CI runs the deterministic suites. See [CONTRIBUTING.md](CONTRIBUTING.md).

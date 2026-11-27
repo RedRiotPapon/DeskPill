@@ -1,4 +1,4 @@
-$ErrorActionPreference='Stop'
+﻿$ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $framework=Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319'
 $runDirectory=Join-Path $env:TEMP ('DeskPill-InteractionTests-'+[Guid]::NewGuid().ToString('N'))
@@ -8,7 +8,7 @@ try {
  & (Join-Path $framework 'csc.exe') /nologo /target:exe ('/out:'+(Join-Path $runDirectory 'AgentFixture.exe')) (Join-Path $root 'tools/AgentFixture.cs')
  if($LASTEXITCODE -ne 0){throw 'Agent fixture compilation failed'}
  $output=Join-Path $runDirectory 'InteractionTests.exe'
- $arguments=@('/nologo','/target:exe','/langversion:5',('/out:'+$output),('/r:'+(Join-Path $runDirectory 'DeskPill.exe')),'/r:System.dll','/r:System.Core.dll','/r:System.Xaml.dll')
+ $arguments=@('/nologo','/target:exe','/langversion:5',('/out:'+$output),('/r:'+(Join-Path $runDirectory 'DeskPill.exe')),'/r:System.dll','/r:System.Drawing.dll','/r:System.Core.dll','/r:System.Xaml.dll')
  foreach($assembly in @('WindowsBase','PresentationCore','PresentationFramework')) { $arguments+='/r:'+(Join-Path $framework ('WPF/'+$assembly+'.dll')) }
  $arguments+=Join-Path $PSScriptRoot 'InteractionTests.cs'
  & (Join-Path $framework 'csc.exe') @arguments

@@ -41,6 +41,27 @@ class InteractionTests {
  }
  [STAThread] static int Main() {
   var app=new Application {ShutdownMode=ShutdownMode.OnExplicitShutdown};Ui.Init(app);System.Threading.SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(app.Dispatcher));
+  Test("Regular users never initialize agent services from housekeeping",delegate {
+   var w=Island();try{Call(w,"TrackAgentContext");Call(w,"ObserveAgentTransitions");Check(Field(w,"agentHub")==null&&Field(w,"agentScreenTarget")==null&&Field(w,"agentSpeech")==null,"Agent housekeeping activated without a connection");}finally{Call(w,"Cleanup");}
+  });
+  Test("Connected Agents offers direct prompt and voice entry",delegate {
+   var w=Island();try{var state=(AppState)Field(w,"state");state.Agents.Add(new AgentProfile{Name="My project"});Call(w,"SelectPage","Agents");Check(Controls<Button>(w).Any(b=>Convert.ToString(b.Content)=="Ask your agent…")&&Controls<Button>(w).Any(b=>Convert.ToString(b.ToolTip)=="Dictate a prompt"),"Agent home still requires navigating to a separate open-conversation action");}finally{Call(w,"Cleanup");}
+  });
+  Test("Screen attachments stay with their draft and cleanup removes private files",delegate {
+   var w=Island();string file=null;try{var state=(AppState)Field(w,"state");var a=new AgentProfile{Name="A"};var b=new AgentProfile{Name="B"};state.Agents.Add(a);state.Agents.Add(b);Call(w,"SelectPage","Agents");Call(w,"ShowAgentConversation",a.Id);
+    using(var bitmap=new System.Drawing.Bitmap(40,30)){using(var g=System.Drawing.Graphics.FromImage(bitmap))g.Clear(System.Drawing.Color.CornflowerBlue);var image=(AgentAttachment)typeof(AgentVision).GetMethod("Save",BindingFlags.Static|BindingFlags.NonPublic).Invoke(null,new object[]{bitmap,"Synthetic fixture"});file=image.FilePath;((Dictionary<string,AgentAttachment>)Field(w,"agentAttachments"))[a.Id]=image;Call(w,"RefreshAgentViews");Check(((Border)Field(w,"agentAttachmentChip")).Visibility==Visibility.Visible,"Attached review chip missing");}
+    Call(w,"ShowAgentConversation",b.Id);Check(((Border)Field(w,"agentAttachmentChip")).Visibility==Visibility.Collapsed,"Attachment crossed agent destinations");Call(w,"ShowAgentConversation",a.Id);Check(((Border)Field(w,"agentAttachmentChip")).Visibility==Visibility.Visible&&File.Exists(file),"Switching discarded draft attachment");Call(w,"ClearAgentAttachment",a.Id);Check(!File.Exists(file),"Removing image left private capture behind");
+   }finally{Call(w,"Cleanup");}
+  });
+  Test("Running work may collapse but capture protects interaction and newer drafts",delegate {
+   var w=Island();try{var state=(AppState)Field(w,"state");var p=new AgentProfile();state.Agents.Add(p);Call(w,"ShowAgentConversation",p.Id);((TextBox)Field(w,"agentPrompt")).Text="Keep draft";var session=((AgentHub)Field(w,"agentHub")).Get(p.Id);session.GetType().GetField("running",Private).SetValue(session,true);Check((bool)w.GetType().GetMethod("CanAutoClose",Private).Invoke(w,null),"Running work forces notch to stay open");w.GetType().GetField("agentCapturing",Private).SetValue(w,true);Check(!(bool)w.GetType().GetMethod("CanAutoClose",Private).Invoke(w,null),"Capture can collapse during selection");w.GetType().GetField("agentCapturing",Private).SetValue(w,false);Call(w,"SetOpen",false);Check(session.Draft=="Keep draft","Auto-collapse lost draft");}finally{Call(w,"Cleanup");}
+  });
+  Test("Attention during a run produces one unread terminal notice without opening",delegate {
+   var w=Island();try{var state=(AppState)Field(w,"state");var p=new AgentProfile();state.Agents.Add(p);Call(w,"SelectPage","Agents");Call(w,"SetOpen",false);var session=((AgentHub)Field(w,"agentHub")).Get(p.Id);var t=session.GetType();t.GetField("running",Private).SetValue(session,true);t.GetField("status",Private).SetValue(session,"Needs attention");Call(w,"ObserveAgentTransitions");t.GetField("running",Private).SetValue(session,false);Call(w,"ObserveAgentTransitions");Check(((HashSet<string>)Field(w,"agentUnread")).Contains(p.Id)&&!(bool)Field(w,"open"),"Terminal failure was lost or opened notch");Call(w,"ShowAgentConversation",p.Id);Check(!((HashSet<string>)Field(w,"agentUnread")).Contains(p.Id),"Reading conversation left unread notice");}finally{Call(w,"Cleanup");}
+  });
+  Test("Conversation streaming preserves selected text and failed-turn history",delegate {
+   var w=Island();try{var state=(AppState)Field(w,"state");var p=new AgentProfile();state.Agents.Add(p);Call(w,"ShowAgentConversation",p.Id);var session=((AgentHub)Field(w,"agentHub")).Get(p.Id);var t=session.GetType();t.GetField("transcript",Private).SetValue(session,"Earlier answer and next turn");Call(w,"RefreshAgentViews");var text=(TextBox)Field(w,"agentResult");text.Select(0,7);t.GetField("transcript",Private).SetValue(session,"Earlier answer and next turn appended");Call(w,"RefreshAgentViews");Check(text.SelectedText=="Earlier","Streaming cleared selection");t.GetField("status",Private).SetValue(session,"Needs attention");t.GetField("summary",Private).SetValue(session,"Try sign-in");Call(w,"RefreshAgentViews");Check(text.Text.Contains("Earlier answer")&&text.Text.Contains("Try sign-in"),"Failure hid retained conversation");}finally{Call(w,"Cleanup");}
+  });
   Test("Connect opens a visible owned editor without blocking the notch and Cancel restores interaction",delegate {
    var w=Island();w.GetType().GetProperty("RuntimeProbeMode",Private).SetValue(w,true,null);w.Show();Call(w,"SelectPage","Agents");
    Exception failure=null;bool inspected=false;var timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(100)};
@@ -75,10 +96,10 @@ class InteractionTests {
    var state=(AppState)Field(w,"state");Check(!state.Settings.VisiblePages().Contains("Agents"),"Hide left Agents in navigation");
    state.Settings.HiddenPages=new string[0];Call(w,"SelectPage","Agents");Check(Convert.ToString(Field(w,"page"))=="Agents","Agents could not be reenabled");Call(w,"Cleanup");
   });
-  Test("Agent target changes preserve separate drafts and pointer exit never discards the editor",delegate {
+  Test("Agent target changes preserve drafts and idle conversations can collapse",delegate {
    var w=Island();var state=(AppState)Field(w,"state");var a=new AgentProfile{Name="First project"};var b=new AgentProfile{Name="Second project"};state.Agents.Add(a);state.Agents.Add(b);
    Call(w,"SelectPage","Agents");Call(w,"ShowAgentConversation",a.Id);var first=(TextBox)Field(w,"agentPrompt");first.Text="Keep this draft";
-   Check(!(bool)typeof(IslandWindow).GetMethod("CanAutoClose",Private).Invoke(w,null),"Hover exit can discard a conversation");
+   Check((bool)typeof(IslandWindow).GetMethod("CanAutoClose",Private).Invoke(w,null),"Idle conversation cannot collapse");
    ((ComboBox)Field(w,"agentPicker")).SelectedItem=b;((TextBox)Field(w,"agentPrompt")).Text="Second draft";Call(w,"ShowAgentConversation",a.Id);
    Check(((TextBox)Field(w,"agentPrompt")).Text=="Keep this draft","Switching target lost draft");first.Text="Old detached control";
    Check(((AgentHub)Field(w,"agentHub")).Get(b.Id).Draft=="Second draft","Detached input overwrote another target");
@@ -138,9 +159,9 @@ class InteractionTests {
     Check(((ComboBox)Field(w,"agentHomePicker")).SelectedItem==b,"Home displays a different destination than its action");
    }finally{Call(w,"Cleanup");}
   });
-  Test("Changing an existing connection provider replaces the old executable and clears edit permission",delegate {
+  Test("Changing provider clears old executable and requires explicit discovery",delegate {
    var original=new AgentProfile{Name="Existing",Executable="C:\\old-provider.exe",AllowEdits=true};var type=typeof(IslandWindow).Assembly.GetType("DeskPill.AgentConnectionWindow");var editor=(Window)Activator.CreateInstance(type,new object[]{original});
-   try{var provider=(ComboBox)Field(editor,"provider");provider.SelectedItem="App shortcut";Check(((TextBox)Field(editor,"executable")).Text=="" && ((CheckBox)Field(editor,"edits")).IsChecked==false,"Provider switch retained old executable or writes");provider.SelectedItem="Claude Code";Check(((TextBox)Field(editor,"executable")).Text==AgentTools.FindExecutable("Claude Code"),"New provider was not detected");}finally{editor.Close();}
+   try{var provider=(ComboBox)Field(editor,"provider");provider.SelectedItem="App shortcut";Check(((TextBox)Field(editor,"executable")).Text=="" && ((CheckBox)Field(editor,"edits")).IsChecked==false,"Provider switch retained old executable or writes");provider.SelectedItem="Claude Code";Check(((TextBox)Field(editor,"executable")).Text=="", "Provider selection performed implicit discovery");}finally{editor.Close();}
   });
   Test("Agent refresh coalesces worker events before entering the dispatcher",delegate {
    var w=Island();for(int i=0;i<10000;i++)Call(w,"QueueAgentRefresh");

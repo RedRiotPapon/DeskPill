@@ -44,7 +44,7 @@ namespace DeskPill
         internal const double InlineAskHeight = 228.0;
         internal const double InlineTodayHeight = 238.0;
         internal const double InlineLyricsHeight = 238.0;
-        internal const double InlineAgentsHeight = 238.0;
+        internal const double InlineAgentsHeight = 264.0;
         internal const double FloatingTopOffset = 10.0;
 
         readonly Path shell;

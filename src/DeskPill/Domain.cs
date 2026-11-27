@@ -33,6 +33,8 @@ namespace DeskPill
         }
         public static string ColorOrDefault(string value, string fallback) { return IsHexColor(value) ? value.ToUpperInvariant() : fallback; }
         public string Monitor = "", Style = "Classic", OpenMode = "Hover", StatusRing = "Water";
+        public bool AgentVoiceToggle = false;
+        public bool AgentCompletionPeeks = true;
         public bool MirrorNotifications = true; public bool DictationEnabled = false;
         public int NotificationSeconds = 6;
         public string FocusNotifications = "History only", FullscreenNotifications = "History only";

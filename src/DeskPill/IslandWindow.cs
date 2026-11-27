@@ -534,7 +534,7 @@ namespace DeskPill
                 return false;
             if (IsInlinePose(pose))
             {
-                if (pose==NotchPose.InlineAgents)return false;
+                if (pose==NotchPose.InlineAgents)return AgentCanAutoClose();
                 if (inlineAskBusy)
                     return false;
                 if (inlineAskInput != null && inlineAskInput.IsKeyboardFocusWithin)
@@ -1416,6 +1416,7 @@ namespace DeskPill
                 Background = Brushes.Transparent,
                 Child = grid
             };
+            hudCard.MouseLeftButtonUp+=delegate{TryOpenAgentNotice();};
             Canvas.SetLeft(hudCard, (IslandMotion.CanvasWidth - 276.0) * 0.5);
             Canvas.SetTop(hudCard, motion.TopOffset + 2.0);
             hudLayer.Children.Add(hudCard);
@@ -1448,6 +1449,7 @@ namespace DeskPill
 
         void ShowRollingHud(string iconGlyph, string label, double targetRatio, double startFrom, string suffix, int holdMs)
         {
+            agentNoticeId="";
             if (hudIcon == null)
                 return;
             if (pose == NotchPose.NotificationPeek) return;
@@ -1487,6 +1489,7 @@ namespace DeskPill
 
         void ShowHud(string iconGlyph, string label, string valueText, double meterRatio, int holdMs)
         {
+            agentNoticeId="";
             if (hudIcon == null)
                 return;
             if (pose == NotchPose.NotificationPeek) return;
@@ -2583,6 +2586,7 @@ namespace DeskPill
         void HideInlineHost()
         {
             PreserveAgentDraft();
+            CloseAgentPreview();agentAttachmentChip=null;agentCaptureButton=null;
             agentPrompt=null;agentResult=null;agentSend=null;agentVoice=null;agentStop=null;agentPicker=null;agentWave=null;agentDetailStatus=null;agentDetails=null;
             inlineAskInput = null;
             inlineAskOutput = null;
@@ -3238,6 +3242,7 @@ namespace DeskPill
         {
             if (stopping)
                 return;
+            TrackAgentContext();ObserveAgentTransitions();
             ticks++;
             await PollGameMode();
             if(stopping)return;

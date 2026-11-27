@@ -30,6 +30,20 @@ class DictationTests
     {
         try
         {
+            // A handled agent start must never fall through to the external paste path.
+            var routing = typeof(DictationAudio).Assembly.GetType("DeskPill.DictationRouting");
+            Check(routing != null, "Shortcut routing supports the open agent draft");
+            var beginRoute = routing.GetMethod("Begin");
+            var endRoute = routing.GetMethod("End");
+            int normalStarts = 0, agentStops = 0, normalStops = 0;
+            beginRoute.Invoke(null, new object[] { new Func<bool>(() => true), new Action(() => normalStarts++) });
+            Check(normalStarts == 0, "Agent draft dictation never starts ordinary paste capture");
+            beginRoute.Invoke(null, new object[] { new Func<bool>(() => false), new Action(() => normalStarts++) });
+            Check(normalStarts == 1, "Outside agent view the ordinary shortcut still starts");
+            endRoute.Invoke(null, new object[] { true, new Action(() => agentStops++), new Action(() => normalStops++) });
+            Check(agentStops == 1 && normalStops == 0, "Release and cancellation route only to active agent voice");
+            endRoute.Invoke(null, new object[] { false, new Action(() => agentStops++), new Action(() => normalStops++) });
+            Check(agentStops == 1 && normalStops == 1, "Ordinary dictation retains its release and cancellation path");
             var data = new byte[]
             {
                 1,

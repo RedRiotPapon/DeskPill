@@ -7,7 +7,13 @@ class AgentFixture {
  string prompt=Console.In.ReadToEnd();
  for(int i=0;i<args.Length-1;i++)if(args[i]=="-p"&&args[i+1].StartsWith("fixture argument")){
  if(args[i+1]!="fixture argument \"quoted\" trailing\\ & | >\nবাংলা")return 3;prompt=args[i+1];}
- if(prompt=="slow")Thread.Sleep(450);
+ if(prompt=="slow"){
+ Console.WriteLine("{\"type\":\"item.started\",\"item\":{\"type\":\"command_execution\",\"command\":\"fixture checking files\"}}");
+ Thread.Sleep(450);}
+ if(prompt=="check-image"){
+ bool found=false;for(int i=0;i<args.Length-1;i++)if(args[i]=="--image"&&System.IO.File.Exists(args[i+1]))found=true;
+ if(!found)return 6;
+ }
  if(prompt=="hold"){Thread.Sleep(60000);return 0;}
  if(prompt=="tree"||prompt=="treeexit"){
  var p=Process.Start(new ProcessStartInfo(Process.GetCurrentProcess().MainModule.FileName,"child"){UseShellExecute=false,CreateNoWindow=true});
