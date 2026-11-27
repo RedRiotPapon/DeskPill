@@ -33,6 +33,10 @@ class UiTests
         Test("Custom colors preview immediately, reject partial hex and roll back on Cancel", CustomPreview);
         Test("Custom palette saves without losing surface options", CustomSave);
         Test("Skin text and primary action contrast remain readable", ThemeContrast);
+        Test("Clipboard search selects and pastes the exact full text", ClipboardWorkflowUI);
+        Test("Clipboard copy-only and empty results never request a paste", ClipboardCopyOnlyUI);
+        Test("Interruption and page preferences save together without losing hidden page data", WorkflowSettings);
+        Test("Recent notifications expose source actions and clear only local history", RecentUI);
         app.Shutdown();
         Console.WriteLine("UI behavioral tests: " + passed + " passed, " + failed + " failed");
         return failed == 0 ? 0 : 1;
@@ -106,6 +110,51 @@ class UiTests
         var custom=new Settings {CustomAccent="#152030"}; Themes.ConfigureCustom(custom); Themes.Apply("Custom");
         Check(Themes.ContrastRatio(color(Themes.PrimaryInk),color(Ui.Green))>=4.5,"Dark custom accent did not choose readable action text");
         Themes.ConfigureCustom(new Settings()); Themes.Apply("Classic");
+    }
+
+    static void ClipboardWorkflowUI()
+    {
+        string chosen=null;bool paste=false;ClipboardPalette w=null;
+        w=new ClipboardPalette(new[]{"alpha one","alpha\ntwo","other"},true,"fixture",delegate(string text,bool insert){chosen=text;paste=insert;w.Close();});
+        Dialog(w,delegate {
+            Controls<TextBox>(w).Single().Text="ALPHA";
+            var list=Controls<ListBox>(w).Single();Check(list.Items.Count==2 && list.SelectedIndex==0,"Search did not filter newest-first");
+            list.SelectedIndex=1;Click(w,"Paste");
+        });
+        Check(chosen=="alpha\ntwo"&&paste,"Palette changed text or selected the wrong item");
+    }
+    static void ClipboardCopyOnlyUI()
+    {
+        string chosen=null;bool paste=true;ClipboardPalette w=null;
+        w=new ClipboardPalette(new[]{"hello"},false,"",delegate(string text,bool insert){chosen=text;paste=insert;w.Close();});
+        Dialog(w,delegate {
+            Check(!Controls<Button>(w).Single(b=>Convert.ToString(b.Content)=="Paste").IsEnabled,"Copy-only palette enabled Paste");
+            Controls<TextBox>(w).Single().Text="missing";Click(w,"Copy");Check(chosen==null,"Empty search copied stale selection");
+            Controls<TextBox>(w).Single().Text="hello";Click(w,"Copy");
+        });
+        Check(chosen=="hello"&&!paste,"Copy-only requested insertion");
+    }
+    static void WorkflowSettings()
+    {
+        var state=new AppState();state.WaterDate=DateTime.Today.ToString("yyyy-MM-dd");state.WaterMl=850;int applied=0;
+        var apps=new[]{new DesktopNotification {AppId="fixture.mail",AppName="Mail fixture"}};
+        var w=new SettingsWindow(state,delegate{applied++;},null,null,apps);
+        Dialog(w,delegate {
+            Click(w,"Notifications");Controls<TextBox>(w).Single().Text="4";
+            Controls<ComboBox>(w).Single(c=>((string[])c.ItemsSource).Contains("Allow peeks")).SelectedItem="Allow peeks";
+            Controls<CheckBox>(w).Single(c=>Convert.ToString(c.Content)=="Mail fixture").IsChecked=false;
+            Click(w,"Pages");Controls<CheckBox>(w).Single(c=>Convert.ToString(c.Content)=="Water").IsChecked=false;Click(w,"Save changes");
+        });
+        Check(applied==1 && state.Settings.NotificationSeconds==4 && state.Settings.FocusNotifications=="Allow peeks" && state.Settings.MutedNotificationApps.Contains("fixture.mail") && state.Settings.HiddenPages.Contains("Water") && state.WaterMl==850,"Settings lost preferences or hidden page data");
+        var cancel=new SettingsWindow(state,delegate{applied++;},null,null,apps);
+        Dialog(cancel,delegate {Click(cancel,"Pages");Controls<CheckBox>(cancel).Single(c=>Convert.ToString(c.Content)=="Water").IsChecked=true;Click(cancel,"Cancel");});
+        Check(applied==1&&state.Settings.HiddenPages.Contains("Water"),"Cancel changed page visibility");
+    }
+    static void RecentUI()
+    {
+        var history=new NotificationHistory();var n=new DesktopNotification {Key="test",AppName="Fixture",AppId="Vendor.App!App",Title="Test title",Body="Full body",CreatedAt=DateTimeOffset.UtcNow};history.Receive(n,new Settings(),false,false);int opened=0;string copied=null;
+        var w=new NotificationHistoryWindow(history,delegate(DesktopNotification item){if(item==n)opened++;},delegate(string text){copied=text;});
+        Dialog(w,delegate {Click(w,"Open app");Click(w,"Copy");Check(opened==1&&copied=="Test title\nFull body","Recent actions dropped source or text");Click(w,"Clear recent");Check(history.Items.Length==0,"Clear did not update Recent");});
     }
 
     static void ThemeSwitch()

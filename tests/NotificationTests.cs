@@ -19,12 +19,32 @@ class NotificationTests {
    inbox.Reset();Check(inbox.Observe(new[]{reused},now.AddSeconds(8)).Count==0,"Re-enabling access establishes a fresh baseline");
    var items=Enumerable.Range(0,20).Select(i=>Item("burst"+i,now.AddSeconds(10+i))).ToArray();
    var burst=inbox.Observe(items,now.AddSeconds(30));
-   Check(burst.Count<=10 && burst.Last().Key=="burst19","A burst is bounded and keeps the latest arrivals");
+   Check(burst.Count==20 && burst.Last().Key=="burst19","A burst retains arrivals for the bounded Recent history");
    Check(inbox.Observe(items,now.AddSeconds(31)).Count==0,"Overflow burst entries are also marked seen");
    var legacy=new AppState {Version=2};legacy.Settings.MirrorNotifications=false;legacy.Normalize(now.LocalDateTime);
    Check(legacy.Settings.MirrorNotifications,"Previous installs enable the requested notification feature on migration");
    legacy.Settings.MirrorNotifications=false;legacy.Normalize(now.LocalDateTime);
    Check(!legacy.Settings.MirrorNotifications,"A saved opt-out stays off after normalization");
+   var history=new NotificationHistory();var settings=new Settings();
+   var queued=Item("queued",now.AddMinutes(-10));queued.AppId="demo.app";queued.Title="Retained";
+   history.Receive(queued,settings,false,false);
+   Check(history.Take(settings,false)==queued && history.Items.Length==1,"pending arrival survives without a freshness expiry");
+   settings.MutedNotificationApps=new[]{"DEMO.APP"};var muted=Item("muted",now);muted.AppId="demo.app";history.Receive(muted,settings,false,false);
+   Check(history.Pending==null && history.Items.Length==2,"muted app is retained in Recent without peeking");
+   settings.MutedNotificationApps=new string[0];var focused=Item("focus",now);history.Receive(focused,settings,true,false);
+   Check(history.Pending==null && history.Items.Length==3,"focus quiet mode retains arrivals without a peek");
+   settings.FocusNotifications="Allow peeks";history.Receive(Item("focus-allowed",now),settings,true,false);
+   Check(history.Take(settings,true)!=null,"focus policy can allow peeks");
+   history.Receive(Item("fullscreen",now),settings,false,true);
+   Check(history.Pending==null,"fullscreen quiet mode stores history only");
+   settings.FullscreenNotifications="After fullscreen";history.Receive(Item("deferred1",now),settings,false,true);history.Receive(Item("deferred2",now),settings,false,true);
+   Check(history.Take(settings,false).Key=="deferred2" && history.Take(settings,false)==null,"resume shows the newest eligible arrival without a backlog barrage");
+   history.Receive(queued,settings,false,false);Check(history.Items.Count(entry=>entry.Key=="queued")==1,"Recent deduplicates arrival identity");
+   for(int i=0;i<70;i++)history.Receive(Item("cap"+i,now),settings,false,false);
+   Check(history.Items.Length==50 && history.Items[0].Key=="cap69","Recent history is bounded newest-first");
+   history.Clear();Check(history.Items.Length==0 && history.Pending==null,"clearing Recent removes pending content");
+   Check(!NotificationLauncher.CanOpen("bad\" /inject") && !NotificationLauncher.CanOpen("bad\napp") && NotificationLauncher.CanOpen("Vendor.App_abc!App"),"source app identifiers cannot inject explorer arguments");
+   Check(!PasteTarget.CanInject(IntPtr.Zero,123,123,true,false) && !PasteTarget.CanInject(new IntPtr(1),123,124,true,false) && !PasteTarget.CanInject(new IntPtr(1),123,123,false,false) && !PasteTarget.CanInject(new IntPtr(1),123,123,true,true),"paste guards reject missing, reused, unfocused or modifier-held targets");
    Console.WriteLine("Notification tests: "+checks+" passed");return 0;
   }catch(Exception e){Console.WriteLine("FAIL "+e.Message);return 1;}
  }

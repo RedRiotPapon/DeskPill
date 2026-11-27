@@ -7,7 +7,7 @@ using System.Reflection;
 
 [assembly: AssemblyTitle("DeskPill")]
 [assembly: AssemblyDescription("A living notch for Windows")]
-[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.1.0.0")]
 namespace DeskPill
 {
     public static class Program

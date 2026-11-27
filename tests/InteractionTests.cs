@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -46,6 +46,27 @@ class InteractionTests {
     Call(w,"ApplyTheme",theme);var shadow=((System.Windows.Shapes.Path)Field(w,"shell")).Effect as System.Windows.Media.Effects.DropShadowEffect;
     foreach(var pose in new[]{NotchPose.Compact,NotchPose.Expanded,NotchPose.OptionsDock,NotchPose.Compact}){Call(w,"SetPose",pose);Check(shadow.Opacity==0 && shadow.Color==Colors.Black,"Halo in "+theme+" "+pose);}
    }} finally {Call(w,"ApplyTheme","Classic");Call(w,"Cleanup");}
+  });
+  Test("Hidden pages disappear from carousel, dots and dock",delegate {
+   var state=new AppState();state.Settings.HiddenPages=new[]{"Music","Water","Focus","Shelf"};state.Settings.FastAnimations=true;
+   var w=new IslandWindow(state,new StateStore(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"hidden-fixture")),true,true);
+   try {
+    Check(Convert.ToString(Field(w,"page"))=="Tasks","Hidden startup page stayed selected");
+    var order=(string[])typeof(IslandWindow).GetMethod("Order",Private).Invoke(w,null);Check(order.SequenceEqual(new[]{"Tasks"}),"Hidden pages remain in navigation");
+    Check(((System.Collections.IDictionary)Field(w,"dockPageButtons")).Count==1,"Dock still exposes hidden pages");
+    Check(((FrameworkElement)Field(w,"prevBtn")).Visibility==Visibility.Collapsed,"Single page kept redundant arrows");
+    Call(w,"ChangePage",1);Check(Convert.ToString(Field(w,"page"))=="Tasks","Single-page navigation escaped visible set");
+   } finally {Call(w,"Cleanup");}
+  });
+  Test("Saving page visibility keeps an open dock aligned and selected",delegate {
+   var w=Island();Call(w,"SetPose",NotchPose.OptionsDock);Call(w,"ShowSettings");var settings=(SettingsWindow)Field(w,"settingsWindow");
+   try {
+    Controls<Button>(settings).Single(b=>Convert.ToString(b.Content)=="Pages").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+    Controls<CheckBox>(settings).Single(c=>Convert.ToString(c.Content)=="Water").IsChecked=false;
+    Controls<Button>(settings).Single(b=>Convert.ToString(b.Content)=="Save changes").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+    var dock=(Border)Field(w,"dockTray");Check(dock.Width==156 && Math.Abs(((TranslateTransform)dock.RenderTransform).Y)<.01 && dock.Opacity==1,"Rebuilt dock was offset or hidden after Save");
+    Check(Convert.ToString(Field(w,"pose"))=="OptionsDock","Settings collapsed the open dock");
+   } finally {settings.Close();Call(w,"Cleanup");}
   });
   Test("Inline Ask Send evaluates arithmetic",delegate {
    var w=Island();Call(w,"ShowInlineAsk");
@@ -143,6 +164,22 @@ class InteractionTests {
    Check(bounds.Width<=174 && bounds.Height==30,"Playback enlarged the regular notch to "+bounds.Width);
    var timer=(FocusClock)Field(w,"focus");timer.Start(DateTime.UtcNow);media.Current.Playing=false;Call(w,"UpdateValues");
    Check(((System.Windows.Shapes.Path)Field(w,"shell")).Data.Bounds.Width<=174,"Focus enlarged the regular notch");Call(w,"Cleanup");
+  });
+  Test("Escape dismisses a preview while another app has focus and ignores a held key",delegate {
+   var w=Island();Call(w,"SetOpen",false);var item=new DesktopNotification {Title="Preview",CreatedAt=DateTimeOffset.UtcNow};
+   Call(w,"ShowNotification",item);Call(w,"ProcessNotificationEscape",false);Call(w,"ProcessNotificationEscape",true);
+   Check(Convert.ToString(Field(w,"pose"))!="NotificationPeek" && Field(w,"notificationCard")==null,"Escape left the preview behind");
+   Call(w,"ShowNotification",item);w.GetType().GetField("notificationEscapeDown",Private).SetValue(w,true);Call(w,"ProcessNotificationEscape",true);
+   Check(Convert.ToString(Field(w,"pose"))=="NotificationPeek","Held Escape dismissed a new preview");
+   Call(w,"ProcessNotificationEscape",false);Call(w,"ProcessNotificationEscape",true);
+   Check(Field(w,"currentNotification")==null,"Fresh Escape did not dismiss");Call(w,"Cleanup");
+  });
+  Test("Notification timeout releases the preview and hover pauses its countdown",delegate {
+   var w=Island();Call(w,"SetOpen",false);Call(w,"ShowNotification",new DesktopNotification {Title="Preview",CreatedAt=DateTimeOffset.UtcNow});
+   var timer=(DispatcherTimer)Field(w,"hudTimer");timer.Start();
+   Call(w,"ProcessPointer",270.0,12.0,DateTime.UtcNow);
+   Check(!timer.IsEnabled,"Hover did not pause expiry");
+   Call(w,"OnHudTimeout");Check(Field(w,"notificationCard")==null && Field(w,"currentNotification")==null && Convert.ToString(Field(w,"pose"))!="NotificationPeek","Timeout retained preview state");Call(w,"Cleanup");
   });
   Test("Notification peek shows source title and body without opening a main page",delegate {
    var w=Island();Call(w,"SetOpen",false);

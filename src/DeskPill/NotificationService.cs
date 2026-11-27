@@ -32,15 +32,43 @@ namespace DeskPill
             primed = true;
             if (seen.Count > 2048)
                 foreach (string key in seen.OrderBy(p => p.Value).Take(seen.Count - 1024).Select(p => p.Key).ToArray()) seen.Remove(key);
-            return arrivals.Skip(Math.Max(0, arrivals.Count - 10)).ToList();
+            return arrivals.Skip(Math.Max(0, arrivals.Count - 50)).ToList();
         }
+    }
+
+    public sealed class NotificationHistory
+    {
+        readonly List<DesktopNotification> items = new List<DesktopNotification>();
+        public event Action Changed;
+        public DesktopNotification Pending { get; private set; }
+        public DesktopNotification[] Items { get { return items.ToArray(); } }
+        public static string AppKey(DesktopNotification n) { return string.IsNullOrWhiteSpace(n.AppId) ? "name:" + n.AppName : n.AppId; }
+        public static bool Allowed(DesktopNotification n, Settings s, bool focusing)
+        {
+            return s.MirrorNotifications && !(s.MutedNotificationApps ?? new string[0]).Contains(AppKey(n), StringComparer.OrdinalIgnoreCase) && (!focusing || s.FocusNotifications == "Allow peeks");
+        }
+        public void Receive(DesktopNotification item, Settings settings, bool focusing, bool fullscreen)
+        {
+            if (items.Any(n => n.Key == item.Key && !string.IsNullOrEmpty(item.Key))) return;
+            items.Insert(0,item); if (items.Count > 50) items.RemoveRange(50,items.Count-50);
+            if (Allowed(item,settings,focusing) && (!fullscreen || settings.FullscreenNotifications == "After fullscreen")) Pending=item;
+            if (Changed != null) Changed();
+        }
+        public DesktopNotification Take(Settings s, bool focusing)
+        {
+            var next=Pending; Pending=null;
+            return next != null && Allowed(next,s,focusing) ? next : null;
+        }
+        public void ClearPending() { Pending=null; }
+        public void Remove(DesktopNotification item) { items.Remove(item); if (object.ReferenceEquals(Pending,item)) Pending=null; if(Changed!=null)Changed(); }
+        public void Clear() { items.Clear(); Pending=null; if(Changed!=null)Changed(); }
     }
 
     public sealed class NotificationService : IDisposable
     {
         readonly NotificationInbox inbox = new NotificationInbox();
         int polling;
-        bool disposed;
+        volatile bool disposed;
         public string Status { get; private set; }
         public NotificationService() { Status = "Waiting for notification access"; }
 
@@ -51,12 +79,12 @@ namespace DeskPill
             if (disposed || Interlocked.CompareExchange(ref polling, 1, 0) != 0) return new List<DesktopNotification>();
             try
             {
-                if (!enabled) { inbox.Reset(); Status = "Notification mirroring is off"; return new List<DesktopNotification>(); }
+                if (!enabled) { lock(inbox) inbox.Reset(); Status = "Notification mirroring is off"; return new List<DesktopNotification>(); }
                 var listener = UserNotificationListener.Current;
                 var access = listener.GetAccessStatus();
                 if (access != UserNotificationListenerAccessStatus.Allowed)
                 {
-                    inbox.Reset();
+                    lock(inbox) inbox.Reset();
                     Status = access == UserNotificationListenerAccessStatus.Denied ? "Access denied · allow DeskPill in Windows notification access settings" : "Notification access needs permission";
                     return new List<DesktopNotification>();
                 }
@@ -73,7 +101,8 @@ namespace DeskPill
                     identities.Add(new DesktopNotification { Key = key, CreatedAt = item.CreationTime });
                 }
                 // Resolve text/app metadata only for new arrivals, keeping each routine poll small.
-                var arrivals = inbox.Observe(identities, DateTimeOffset.UtcNow);
+                List<DesktopNotification> arrivals;
+                lock(inbox) arrivals = inbox.Observe(identities, DateTimeOffset.UtcNow);
                 var projected = new List<DesktopNotification>();
                 foreach (var arrival in arrivals)
                 {
@@ -119,6 +148,6 @@ namespace DeskPill
             return Status;
         }
         static string Limit(string value, int max) { value = value ?? ""; return value.Length <= max ? value : value.Substring(0, max); }
-        public void Dispose() { disposed = true; inbox.Reset(); }
+        public void Dispose() { disposed = true; lock(inbox) inbox.Reset(); }
     }
 }

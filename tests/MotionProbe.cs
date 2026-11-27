@@ -224,6 +224,7 @@ class MotionProbe
             state.Settings.ShowClock = false;
             state.Settings.FastAnimations = false;
             var w = new IslandWindow(state, new StateStore(temporary), true, false);
+            w.GetType().GetProperty("RuntimeProbeMode", Private).SetValue(w,true,null);
             SetField(w, "polling", true);
             w.GetType().GetProperty("SuppressCursorWatch", Private).SetValue(w, true, null);
             Call(w, "ChangePage", 2);

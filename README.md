@@ -13,8 +13,8 @@ DeskPill is a small desktop notch that expands when you need it. Control your mu
 - **Focus:** work/break timer with progress that survives restarts.
 - **Shelf:** drop files to keep shortcuts handy, then open, copy or drag them into another app.
 - **Tasks & water:** lightweight tasks and optional hydration tracking.
-- **Windows notifications:** previews for new notifications, with hover-to-hold and dismiss.
-- **Quick tools:** clipboard history, screen OCR, calendar import, and an optional Gemini assistant.
+- **Windows notifications:** previews with Open app, Copy and Recent actions, app-level interruption controls, and an in-memory history of the last 50 arrivals.
+- **Quick tools:** searchable clipboard history with keyboard selection and plain-text paste back to your previous app, screen OCR, calendar import, and an optional Gemini assistant.
 - **Personalization:** Classic plus seven skins, live theme preview, and your own six-color Custom palette with matte/satin finish and outline strength.
 
 The notch yields to occupied title-bar space, supports fullscreen hiding, and respects Windows reduced-motion settings. Startup is opt-in.
@@ -32,8 +32,17 @@ Download the portable ZIP from [Releases](https://github.com/RedRiotPapon/DeskPi
 | --- | --- |
 | `Ctrl+Alt+Space` | Open Ask |
 | `Ctrl+Alt+T` | Select a screen region for OCR |
+| `Ctrl+Alt+V` | Search clipboard history and paste to the previous app |
 
-Shortcuts can conflict with other applications; the tray menu remains available. Settings also offers click-to-open mode, display selection, scale, position and page order.
+Shortcuts can conflict with other applications; the tray menu remains available. Settings also offers click-to-open mode, display selection, scale, position, page order and visibility. Hiding a page keeps its data.
+
+## Quiet by choice
+
+**Settings → Notifications** controls peek duration, focus/fullscreen behavior and apps allowed to show peeks. Quiet notifications remain in Recent; hiding DeskPill in fullscreen remains independent. Focus and fullscreen default to history only. These controls affect DeskPill, not Windows Do Not Disturb.
+
+Use **Recent notifications** in the tray or right-click menu to review arrivals. Notifications received while you use a page wait without a 30-second expiry; only the newest eligible deferred arrival peeks afterward. History stays in memory and clears on exit.
+
+**Settings → Pages** lets you hide unused pages and reorder the rest. Keep at least one visible.
 
 ## Make it yours
 
@@ -50,7 +59,7 @@ You need Windows, .NET Framework 4.8 and Windows SDK metadata (`Windows.winmd`).
 ```powershell
 .\build.ps1            # Compile to bin/DeskPill.exe
 .\build.ps1 -Test      # Build and run all test suites
-.\package.ps1          # Create dist/DeskPill-1.0.0-portable.zip
+.\package.ps1          # Create dist/DeskPill-1.1.0-portable.zip
 ```
 
 The solution is also available as `DeskPill.sln`. Full UI, media and OCR probes require an interactive Windows desktop; CI runs the deterministic suites. See [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -63,12 +72,12 @@ Ask sends submitted prompts to Google when you configure your own Gemini key; th
 
 ## Current limits
 
-- Notification previews do not open or reply through the originating app. Queued previews expire after 30 seconds.
-- Clipboard history is text-only, with no search, pinning or quick-paste palette yet.
+- Open app launches the registered source app, not the exact message. Inline replies are not supported. Esc dismisses the active preview even while another app has focus. Previews expire after the configured duration (six seconds by default); hovering pauses the countdown. Recent holds up to 50 arrivals for the current session, and deferred peeks coalesce to the newest eligible arrival.
+- Clipboard history is text-only and does not yet support pinning. If Windows blocks focus or input to a target app, text stays copied for manual paste.
 - Media controls depend on the source app exposing a Windows media session; brightness support depends on the display.
 - OCR depends on Windows OCR language availability. Protected applications and unsupported accessibility trees may limit window overlap detection.
 - ICS import does not expand recurring events. Optional services can require network access and provider credentials.
-- The portable executable is unsigned. Mixed-DPI hardware and frame pacing need broader testing.
+- The portable executable is unsigned. Frame callback pacing is measured locally; physical mixed-DPI monitor transitions still need broader hardware testing. See [performance measurements](docs/PERFORMANCE.md).
 
 ## Project layout
 
@@ -83,3 +92,5 @@ docs/images/       Curated DeskPill images using isolated demo data
 Bugs and focused pull requests are welcome. Include the Windows version, display scaling and reproduction steps. Keep reports free of private notification contents or API keys.
 
 [MIT License](LICENSE). Images use demo data generated from DeskPill itself.
+
+If DeskPill is useful to you, consider giving the repository a ⭐.

@@ -16,7 +16,11 @@ Useful commands:
 ./tests/domain.ps1
 ./tests/integrations.ps1
 ./tests/notifications.ps1
+./scripts/measure-motion.ps1
+./scripts/test-paste-delivery.ps1
 ./package.ps1 -SkipBuild
 ```
 
 Report bugs through GitHub Issues with Windows version, monitor scale, app version and steps to reproduce. Do not include notification text, clipboard history or API keys.
+
+Run motion measurements alone on an idle interactive desktop. They record WPF callback pacing, not actual compositor presentation times. The paste delivery probe briefly activates its own test windows and intercepts Ctrl+V without reading or changing the clipboard.

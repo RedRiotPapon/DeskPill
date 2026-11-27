@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Runtime.Serialization.Json;
 
 namespace DeskPill
@@ -30,6 +31,10 @@ namespace DeskPill
         public static string ColorOrDefault(string value, string fallback) { return IsHexColor(value) ? value.ToUpperInvariant() : fallback; }
         public string Monitor = "", Style = "Classic", OpenMode = "Hover", StatusRing = "Water";
         public bool MirrorNotifications = true;
+        public int NotificationSeconds = 6;
+        public string FocusNotifications = "History only", FullscreenNotifications = "History only";
+        public string[] MutedNotificationApps = new string[0], HiddenPages = new string[0];
+        public string[] VisiblePages() { var order = PageOrder ?? new[] { "Music" }; var visible = order.Where(p => !(HiddenPages ?? new string[0]).Contains(p)).ToArray(); return visible.Length > 0 ? visible : new[] { "Music" }; }
         public bool ShowClock = true, ShowMascot = true, AutoShrinkOnTabs = true, MinimalNotch = false, ShowHudPopups = true, Sound = true, HideFullscreen = true, FastAnimations = false, ClipboardEnabled = true, KeepClipboard = false, StartWithWindows = false;
         public int FocusMinutes = 25, ShortBreakMinutes = 5, LongBreakMinutes = 15, BottleMl = 250, WaterGoalMl = 2000, ActiveStart = 8, ActiveEnd = 22, ReminderMinutes = 60;
         public string CalendarSource = "", GeminiModel = "gemini-2.5-flash", ProtectedApiKey = "", WeatherLocation = "";
@@ -44,6 +49,12 @@ namespace DeskPill
             "Water",
             "Tasks"
         };
+    }
+
+    public static class ClipboardSearch
+    {
+        public static string[] Find(IEnumerable<string> items,string query)
+        {query=(query??"").Trim();return items.Where(s=>!string.IsNullOrWhiteSpace(s)&&s.IndexOf(query,StringComparison.OrdinalIgnoreCase)>=0).Distinct().Take(50).ToArray();}
     }
 
     public class TodoItem
@@ -130,6 +141,12 @@ namespace DeskPill
                 if (!pages.Contains(page))
                     pages.Add(page);
             s.PageOrder = pages.ToArray();
+            s.HiddenPages = (s.HiddenPages ?? new string[0]).Where(p => pages.Contains(p)).Distinct().ToArray();
+            if (s.HiddenPages.Length == pages.Count) s.HiddenPages = s.HiddenPages.Where(p => p != "Music").ToArray();
+            s.MutedNotificationApps = (s.MutedNotificationApps ?? new string[0]).Where(p => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase).Take(200).ToArray();
+            s.NotificationSeconds = s.NotificationSeconds == 0 ? 6 : Clamp(s.NotificationSeconds, 2, 15);
+            if (s.FocusNotifications != "Allow peeks") s.FocusNotifications = "History only";
+            if (s.FullscreenNotifications != "After fullscreen") s.FullscreenNotifications = "History only";
             if (Tasks == null)
                 Tasks = new List<TodoItem>();
             Tasks.RemoveAll(delegate (TodoItem t)

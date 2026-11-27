@@ -135,6 +135,15 @@ class DomainTests
                 Directory.Delete(cleanup, true);
             }
 
+            var visibility=new AppState();visibility.Settings.HiddenPages=new[]{"Water","Focus","unknown","Water"};visibility.Normalize(DateTime.Now);
+            Check(string.Join(",",visibility.Settings.VisiblePages())=="Music,Shelf,Tasks","hidden pages filter navigation without changing order");
+            visibility.Settings.HiddenPages=visibility.Settings.PageOrder;visibility.Normalize(DateTime.Now);
+            Check(visibility.Settings.VisiblePages().Length==1 && visibility.Settings.VisiblePages()[0]=="Music","malformed all-hidden state retains one page");
+            visibility.Settings.NotificationSeconds=90;visibility.Settings.MutedNotificationApps=new[]{"APP","app",""};visibility.Normalize(DateTime.Now);
+            Check(visibility.Settings.NotificationSeconds==15 && visibility.Settings.MutedNotificationApps.Length==1,"notification controls normalize safely");
+            var clips=new[]{" First line\nSecond line ","project alpha","PROJECT beta","project alpha"};
+            Check(ClipboardSearch.Find(clips," PROJECT ").Length==2 && ClipboardSearch.Find(clips,"second")[0]==clips[0],"clipboard search ignores query case and preserves full paste text");
+            Check(ClipboardSearch.Find(clips,"missing").Length==0,"clipboard search handles no results");
             string answer;
             Check(QuickMath.TryEvaluate("2+3*4", out answer) && answer == "14", "math precedence");
             Check(QuickMath.TryEvaluate("-(2+3)*4", out answer) && answer == "-20", "math parentheses unary");

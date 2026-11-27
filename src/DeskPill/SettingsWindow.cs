@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -32,7 +32,7 @@ namespace DeskPill
         PasswordBox apiKey;
         TextBlock keyStatus;
         ListBox pageList;
-        public SettingsWindow(AppState state, Action apply, Action<string> notify, Action<string> previewTheme = null)
+        public SettingsWindow(AppState state, Action apply, Action<string> notify, Action<string> previewTheme = null, IEnumerable<DesktopNotification> knownNotifications = null)
         {
             this.state = state;
             this.apply = apply;
@@ -84,6 +84,7 @@ namespace DeskPill
             AddPage(nav, "Pages", Pages());
             AddPage(nav, "Focus & water", FocusWater());
             AddPage(nav, "Clipboard", Clipboard());
+            AddPage(nav, "Notifications", NotificationOptions(knownNotifications ?? new DesktopNotification[0]));
             AddPage(nav, "Calendar", Calendar());
             AddPage(nav, "Ask & weather", Ask());
             AddPage(nav, "Prayer", Prayer());
@@ -432,7 +433,7 @@ namespace DeskPill
 
         StackPanel Pages()
         {
-            var p = Page("Pages", "Choose a page and move it up or down. All five pages remain available.");
+            var p = Page("Pages", "Reorder pages, then choose which ones appear in navigation. Hidden pages keep their data.");
             pageList = new ListBox
             {
                 Height = 220,
@@ -481,6 +482,17 @@ namespace DeskPill
                     throw new ArgumentException("Page order must contain each of the five pages once.");
                 draft.PageOrder = order;
             });
+            Label(p,"Visible pages");
+            var visible=new Dictionary<string,CheckBox>();
+            foreach (string name in new Settings().PageOrder)
+            {
+                var choice=new CheckBox {Content=name,IsChecked=!(draft.HiddenPages??new string[0]).Contains(name)};
+                System.Windows.Automation.AutomationProperties.SetName(choice,"Show "+name+" page"); visible[name]=choice;p.Children.Add(choice);
+            }
+            readers.Add(delegate {
+                if(!visible.Values.Any(c=>c.IsChecked==true))throw new ArgumentException("Keep at least one page visible.");
+                draft.HiddenPages=visible.Where(c=>c.Value.IsChecked!=true).Select(c=>c.Key).ToArray();
+            });
             return p;
         }
 
@@ -493,6 +505,28 @@ namespace DeskPill
             pageList.Items.RemoveAt(i);
             pageList.Items.Insert(j, item);
             pageList.SelectedIndex = j;
+        }
+
+        StackPanel NotificationOptions(IEnumerable<DesktopNotification> known)
+        {
+            var p=Page("Notifications","Quiet controls for new arrivals. Recent notifications stay in memory until you clear them or close DeskPill.");
+            Number(p,"Peek duration (seconds)","NotificationSeconds",2,15);
+            Choice(p,"During focus sessions","FocusNotifications",new[]{"History only","Allow peeks"});
+            Choice(p,"During fullscreen apps","FullscreenNotifications",new[]{"History only","After fullscreen"});
+            Note(p,"History only keeps arrivals in Recent without a peek. After fullscreen shows only the newest eligible pending arrival when you leave fullscreen. Peeks wait while you use the notch.");
+            Label(p,"Apps allowed to show peeks");
+            var muted=new HashSet<string>(draft.MutedNotificationApps??new string[0],StringComparer.OrdinalIgnoreCase);
+            var remembered=muted.Select(key=>new DesktopNotification {AppId=key.StartsWith("name:",StringComparison.Ordinal)?"":key,AppName=key.StartsWith("name:",StringComparison.Ordinal)?key.Substring(5):key});
+            var apps=known.Concat(remembered).GroupBy(NotificationHistory.AppKey,StringComparer.OrdinalIgnoreCase).Select(g=>g.First()).OrderBy(n=>n.AppName).ToArray();
+            if(apps.Length==0)Note(p,"Apps appear here after a notification arrives. Mirroring and Windows notification access are in General.");
+            foreach(var app in apps)
+            {
+                string key=NotificationHistory.AppKey(app);
+                var check=new CheckBox {Content=app.AppName,IsChecked=!muted.Contains(key)};
+                System.Windows.Automation.AutomationProperties.SetName(check,"Allow peeks from "+app.AppName);p.Children.Add(check);
+                readers.Add(delegate {if(check.IsChecked==true)muted.Remove(key);else muted.Add(key);draft.MutedNotificationApps=muted.ToArray();});
+            }
+            return p;
         }
 
         StackPanel FocusWater()
@@ -516,7 +550,7 @@ namespace DeskPill
 
         StackPanel Clipboard()
         {
-            var p = Page("Clipboard", "Clipboard history is captured locally while DeskPill is running.");
+            var p = Page("Clipboard", "Clipboard history is captured locally while DeskPill is running. Ctrl+Alt+V opens search, selection and plain-text paste back to the app you came from.");
             Check(p, "Enable clipboard history", "ClipboardEnabled");
             Check(p, "Keep clipboard history after closing DeskPill", "KeepClipboard");
             Note(p, "Retention is limited to the latest 50 text entries. With persistence off, history stays in memory and is excluded from the saved state. Sensitive copied text may appear here; disable capture when needed.");
@@ -589,7 +623,7 @@ namespace DeskPill
             var p = Page("About & shortcuts", "DeskPill · a native Windows desktop island");
             Note(p, "Media controls use available Windows media sessions. Brightness requires supported display hardware; volume and battery depend on system capabilities. Screen OCR uses Windows recognition support. Unsupported controls report their availability.");
             Note(p, "Clipboard capture runs only when enabled. Screen capture and selected files are used only for the action you request. Calendar feeds, lyrics, weather and Ask require network access when used.");
-            Note(p, "Keyboard: Tab moves between controls; Enter activates the focused button; Escape closes settings without saving. See the island tooltips for registered global shortcuts.");
+            Note(p, "Keyboard: Tab moves between controls; Enter activates the focused button; Escape closes settings without saving. Ctrl+Alt+V opens clipboard search and paste. Esc dismisses notification previews while you work in another app. See the island tooltips for other registered global shortcuts.");
             return p;
         }
 
