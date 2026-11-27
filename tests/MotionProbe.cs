@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -120,6 +120,45 @@ class MotionProbe
         Console.WriteLine("FRAME " + name + " shape=" + ShapeWidth(w).ToString("0.0") + "x" + Height(w).ToString("0.0") + " window=" + w.Width + "x" + w.Height);
     }
 
+    static double[] CadenceSamples(int hz,int transition,bool stall)
+    {
+        var type=typeof(IslandWindow).Assembly.GetType("DeskPill.IslandMotion");
+        var motion=type.GetConstructors(BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic).Single().Invoke(new object[]{new System.Windows.Shapes.Path(),new System.Windows.Shapes.Path(),new Canvas(),null});
+        bool opening=transition==0,closing=transition==2,tiny=transition==3,dock=transition==1;
+        type.GetMethod("SnapPose").Invoke(motion,new object[]{opening?150.0:396.0,opening?30.0:172.0,false,false});
+        type.GetMethod("MoveToPose").Invoke(motion,new object[]{tiny?52.0:closing?150.0:396.0,tiny?6.0:closing?30.0:dock?206.0:172.0,dock,false,opening,closing,tiny,false,null});
+        type.GetMethod("Stop").Invoke(motion,null);
+        var step=type.GetMethod("StepPhysics",Private);var values=new List<double>();double elapsed=0;bool stalled=false;
+        foreach(double sample in new[]{.08,.18,.35,.7})
+        {
+            while(elapsed<sample-.0000001)
+            {
+                double dt=Math.Min(1.0/hz,sample-elapsed);
+                if(stall&&!stalled&&elapsed>=.08){dt=Math.Min(.05,sample-elapsed);stalled=true;}
+                step.Invoke(motion,new object[]{dt});elapsed+=dt;
+            }
+            values.Add((double)type.GetProperty("CurrentWidth").GetValue(motion,null));
+            values.Add((double)type.GetProperty("CurrentHeight").GetValue(motion,null));
+        }
+        return values.ToArray();
+    }
+    static void VerifyRefreshCadences()
+    {
+        // Up to 3 DIPs numerical variation across a 224-DIP width change; this is not a display-pacing guarantee.
+        var names=new[]{"opening","options","closing","tiny tuck"};
+        for(int transition=0;transition<4;transition++)
+        {
+            var reference=CadenceSamples(240,transition,false);
+            foreach(int hz in new[]{30,60,75,90,120,144,165,240,360})
+            {
+                var actual=CadenceSamples(hz,transition,false);double error=actual.Select((v,i)=>Math.Abs(v-reference[i])).Max();
+                Check(error<3.0,names[transition]+" has consistent wall-time motion at simulated "+hz+" Hz (max delta "+error.ToString("0.00")+" DIP)");
+            }
+            var interrupted=CadenceSamples(60,transition,true);double stallError=interrupted.Select((v,i)=>Math.Abs(v-reference[i])).Max();
+            Check(stallError<3.0,names[transition]+" retains timing through a simulated 50 ms frame gap (max delta "+stallError.ToString("0.00")+" DIP)");
+        }
+    }
+
     static void VerifySpringPhysics()
     {
         var type = typeof(IslandWindow).Assembly.GetType("DeskPill.IslandMotion");
@@ -215,6 +254,7 @@ class MotionProbe
             }
 
             VerifySpringPhysics();
+            VerifyRefreshCadences();
 
             var state = new AppState();
             state.Settings.ClipboardEnabled = false;

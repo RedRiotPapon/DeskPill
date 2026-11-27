@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
@@ -26,7 +26,7 @@ namespace DeskPill
     // - Tiny:      stiffness=200, damping=29.00 (critically damped shrink when browser tabs overlap)
     // - Re-expand: stiffness=230, damping=19.00 (zeta ~0.63, plush organic hover morph)
     // - PageSlide: stiffness=360, damping=30.00 (continuous horizontal spring carousel)
-    // Uses RenderingEventArgs.RenderingTime deduplication + dt spike smoothing and detaches at rest.
+    // Uses RenderingTime deduplication, elapsed-time spring integration and detaches at rest.
     sealed class IslandMotion
     {
         internal const double CanvasWidth = 540.0;
@@ -385,7 +385,7 @@ namespace DeskPill
 
         internal void StepPhysics(double dt)
         {
-            // Sub-step to <= 4ms for unconditional spring stability across 60..240Hz displays.
+            // Sub-step to <= 4ms to keep spring integration stable across frame cadences.
             int steps = Math.Max(1, (int)Math.Ceiling(dt / 0.004));
             double h = dt / steps;
             for (int i = 0; i < steps; i++)

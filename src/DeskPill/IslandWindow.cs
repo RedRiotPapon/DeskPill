@@ -20,6 +20,7 @@ namespace DeskPill
 {
     public sealed class IslandWindow : Window
     {
+        const double HoverOpenDelayMs = 110, HoverOptionsDelayMs = 130;
         const double ExpandedWidthClassic = 396.0;
         const double ExpandedWidthFloating = 380.0;
         const double ExpandedOffsetX = (IslandMotion.CanvasWidth - ExpandedWidthClassic) * 0.5;
@@ -984,7 +985,7 @@ namespace DeskPill
                     else if (dockZone)
                     {
                         if (dockIntentSince == DateTime.MinValue) dockIntentSince = now;
-                        if ((now - dockIntentSince).TotalMilliseconds >= 60) SetPose(NotchPose.OptionsDock);
+                        if ((now - dockIntentSince).TotalMilliseconds >= HoverOptionsDelayMs) SetPose(NotchPose.OptionsDock);
                     }
                     else dockIntentSince = DateTime.MinValue;
                 }
@@ -1008,7 +1009,7 @@ namespace DeskPill
                 else if (!hoverBlockedUntilExit && state.Settings.OpenMode == "Hover")
                 {
                     if (hoverIntentSince == DateTime.MinValue) hoverIntentSince = now;
-                    if ((now - hoverIntentSince).TotalMilliseconds >= 50)
+                    if ((now - hoverIntentSince).TotalMilliseconds >= HoverOpenDelayMs)
                     {
                         closeTimer.Stop();
                         hudTimer.Stop();

@@ -18,6 +18,8 @@ DeskPill is a small desktop notch that expands when you need it. Control your mu
 - **English dictation:** optional offline speech to text with its own listening panel, Win+Space shortcut, cancellation and guarded paste. No separate app is required.
 - **Personalization:** Classic plus seven skins, live theme preview, and your own six-color Custom palette with matte/satin finish and outline strength.
 
+Hover intent waits at least 110 ms before opening and 130 ms before revealing options, helping brief pointer passes stay quiet. Click actions respond immediately.
+
 The notch yields to occupied title-bar space, supports fullscreen hiding, and respects Windows reduced-motion settings. Startup is opt-in.
 
 ## Run it
@@ -69,7 +71,7 @@ You need Windows, .NET Framework 4.8 and Windows SDK metadata (`Windows.winmd`).
 ```powershell
 .\build.ps1            # Compile to bin/DeskPill.exe
 .\build.ps1 -Test      # Build and run all test suites
-.\package.ps1          # Create dist/DeskPill-1.2.0-portable.zip
+.\package.ps1          # Create dist/DeskPill-1.2.1-portable.zip
 ```
 
 The solution is also available as `DeskPill.sln`. Full UI, media and OCR probes require an interactive Windows desktop; CI runs the deterministic suites. See [CONTRIBUTING.md](CONTRIBUTING.md).

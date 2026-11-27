@@ -167,10 +167,18 @@ class InteractionTests {
    Check(Math.Abs(width-dockWidth)<0.1,"Options moved the page edges sideways");
    Check(Controls<Button>((DependencyObject)Field(w,"dockTray")).Count()==6,"Expected five page icons and Settings");Call(w,"Cleanup");
   });
-  Test("Hover options respond promptly to deliberate hover",delegate {
+  Test("Brief pointer passes do not open the notch; a relaxed dwell does",delegate {
+   var w=Island();Call(w,"SetOpen",false);var now=DateTime.UtcNow;
+   Call(w,"ProcessPointer",0.0,260.0,now);Call(w,"ProcessPointer",270.0,12.0,now.AddMilliseconds(10));
+   Call(w,"ProcessPointer",270.0,12.0,now.AddMilliseconds(90));Check(!(bool)Field(w,"open"),"Brief hover opened the notch too eagerly");
+   Call(w,"ProcessPointer",270.0,12.0,now.AddMilliseconds(130));Check((bool)Field(w,"open"),"Deliberate hover remained unresponsive");Call(w,"Cleanup");
+  });
+  Test("Options wait through a brief pass and open after a relaxed dwell",delegate {
    var w=Island();var now=DateTime.UtcNow;
    Call(w,"ProcessPointer",270.0,162.0,now);Call(w,"ProcessPointer",270.0,162.0,now.AddMilliseconds(80));
-   Check(Convert.ToString(Field(w,"pose"))=="OptionsDock","Options still waiting after a deliberate hover");Call(w,"Cleanup");
+   Check(Convert.ToString(Field(w,"pose"))=="Expanded","Options opened too eagerly");
+   Call(w,"ProcessPointer",270.0,162.0,now.AddMilliseconds(145));
+   Check(Convert.ToString(Field(w,"pose"))=="OptionsDock","Deliberate options hover remained unresponsive");Call(w,"Cleanup");
   });
   Test("Opening content fades progressively without a blank width gate",delegate {
    var w=Island();object motion=Field(w,"motion");Type type=motion.GetType();
