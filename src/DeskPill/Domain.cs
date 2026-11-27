@@ -50,7 +50,8 @@ namespace DeskPill
             "Shelf",
             "Focus",
             "Water",
-            "Tasks"
+            "Tasks",
+            "Agents"
         };
     }
 
@@ -69,6 +70,13 @@ namespace DeskPill
         public bool StartNotified, EndNotified;
     }
 
+    public class AgentProfile
+    {
+        public string Id = Guid.NewGuid().ToString("N"), Name = "", Provider = "Codex CLI", Executable = "", Workspace = "";
+        public bool AllowEdits;
+        public override string ToString() { return Name; }
+    }
+
     public class AppState
     {
         public string FocusPhase = "Focus";
@@ -78,6 +86,8 @@ namespace DeskPill
         public DateTime FocusDeadlineUtc = new DateTime(0, DateTimeKind.Utc);
         public int Version = 3;
         public Settings Settings = new Settings();
+        public List<AgentProfile> Agents = new List<AgentProfile>();
+        public string SelectedAgent = "";
         public List<TodoItem> Tasks = new List<TodoItem>();
         public List<string> Shelf = new List<string>(), Clipboard = new List<string>();
         public string WaterDate;
@@ -96,6 +106,20 @@ namespace DeskPill
         {
             if (Settings == null)
                 Settings = new Settings();
+            Agents = (Agents ?? new List<AgentProfile>()).Where(x=>x!=null).Take(20).ToList();
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            foreach(var agent in Agents)
+            {
+                Guid id;
+                if(!Guid.TryParse(agent.Id,out id)||!ids.Add(agent.Id)){agent.Id=Guid.NewGuid().ToString("N");ids.Add(agent.Id);}
+                agent.Name = (agent.Name ?? "").Trim();if(agent.Name.Length>60)agent.Name=agent.Name.Substring(0,60);
+                if(agent.Name.Length==0)agent.Name="My agent";
+                if(!new[]{"Codex CLI","Claude Code","Gemini CLI","App shortcut"}.Contains(agent.Provider))agent.Provider="App shortcut";
+                agent.Executable=(agent.Executable??"").Trim();agent.Workspace=(agent.Workspace??"").Trim();
+                if(agent.Executable.Length>1024)agent.Executable="";if(agent.Workspace.Length>1024)agent.Workspace="";
+                if(agent.Provider!="Codex CLI")agent.AllowEdits=false;
+            }
+            if(!Agents.Any(x=>x.Id==SelectedAgent))SelectedAgent=Agents.Count==0?"":Agents[0].Id;
             var s = Settings;
             if (Version < 2)
             {

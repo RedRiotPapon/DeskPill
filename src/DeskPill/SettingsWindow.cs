@@ -606,14 +606,7 @@ namespace DeskPill
                 FontSize = 15,
                 BorderBrush = Ui.Line
             };
-            foreach (var name in new[]
-            {
-                "Music",
-                "Shelf",
-                "Focus",
-                "Water",
-                "Tasks"
-            }.OrderBy(delegate (string s)
+            foreach (var name in new Settings().PageOrder.OrderBy(delegate (string s)
             {
                 int i = Array.IndexOf(draft.PageOrder ?? new string[0], s);
                 return i < 0 ? 99 : i;
@@ -631,19 +624,9 @@ namespace DeskPill
             readers.Add(delegate
             {
                 var order = pageList.Items.Cast<string>().ToArray();
-                var known = new[]
-                {
-                    "Music",
-                    "Shelf",
-                    "Focus",
-                    "Water",
-                    "Tasks"
-                };
-                if (order.Length != 5 || order.Distinct().Count() != 5 || order.Any(delegate (string x)
-                {
-                    return !known.Contains(x);
-                }))
-                    throw new ArgumentException("Page order must contain each of the five pages once.");
+                var known = new Settings().PageOrder;
+                if (order.Length != known.Length || order.Distinct().Count() != known.Length || order.Any(x=>!known.Contains(x)))
+                    throw new ArgumentException("Page order must contain each page once.");
                 draft.PageOrder = order;
             });
             Label(p,"Visible pages");

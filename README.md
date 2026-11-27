@@ -1,6 +1,6 @@
-<p align="center"><img src="assets/DeskPill.svg" width="72" alt="DeskPill icon"></p>
+﻿<p align="center"><img src="assets/DeskPill.svg" width="72" alt="DeskPill icon"></p>
 <h1 align="center">DeskPill</h1>
-<p align="center">A quiet home for music, focus and everyday tools at the top of your Windows desktop.</p>
+<p align="center">A quiet home for music, focus, agents and everyday tools at the top of your Windows desktop.</p>
 <p align="center">Windows 10/11 · Native WPF · .NET Framework 4.8 · MIT license</p>
 
 ![DeskPill showing media, focus and custom themes](docs/images/desk-pill.png)
@@ -9,6 +9,7 @@ DeskPill is a small desktop notch that expands when you need it. Control your mu
 
 ## What it does
 
+- **Agents Home:** a separate, optional page for your own CLI sessions and app shortcuts. Send reviewed prompts, follow responses and stop owned runs.
 - **Music:** real Windows media sessions, artwork, playback controls and seeking. Click the artwork or track title to open its source app or matching browser tab.
 - **Focus:** work/break timer with progress that survives restarts.
 - **Shelf:** drop files to keep shortcuts handy, then open, copy or drag them into another app.
@@ -48,6 +49,20 @@ Use **Recent notifications** in the tray or right-click menu to review arrivals.
 
 **Settings → Pages** lets you hide unused pages and reorder the rest. Keep at least one visible.
 
+## Agents Home · version 2
+
+![Agents Home conversation using isolated demo data](docs/images/agents-home.png)
+
+**Agents** is visible by default, including after upgrading. Use **Settings → Pages** to hide, restore or reorder it; hiding keeps your connections. Music and everyday tools work without setting up an agent.
+
+Choose **Connect agent**, name the connection, pick its installed tool and project folder, then open its conversation. Codex CLI, Claude Code and Gemini CLI adapters run separate sessions owned by DeskPill. Follow up in the same session, switch destinations without losing drafts, and use **Stop** to end that run. The home page’s manage menu offers edit, remove and new conversation. A quiet dot on the compact notch shows working or attention states while Agents is visible; game mode suppresses it.
+
+Connections default to **Review only**. Codex project edits require an explicit connection setting. Tools use their existing sign-in and billing. Install and authenticate your CLI separately; automatic detection supports native `.exe` installations. Node/npm `.cmd` shims are not currently supported. Gemini plan mode depends on the installed CLI’s capabilities.
+
+For Antigravity, desktop/cloud tools or another agent without a supported connection, choose **App shortcut**. DeskPill offers **Copy prompt** and **Open app** for manual handoff. It does not discover or control that app’s existing conversations.
+
+With the optional English speech pack installed, **hold the microphone button** (or focus it and hold Space), speak, and release to fill the draft. The waveform follows microphone input. Review your words, then click **Send** or press **Ctrl+Enter**. Esc cancels speech; another Esc returns to the page. Voice never dispatches a prompt automatically. Drafts and responses stay in memory and clear when DeskPill exits; connection profiles are saved locally. Provider tools may keep their own history. [Connection details and limits](docs/AGENTS.md).
+
 ## Music shortcuts
 
 Click the **artwork or track title** to return to the playing app. Chrome, Edge, Brave, Vivaldi, Opera, Firefox and Chromium can select a matching accessible tab using the media title and artist. Tab selection needs a complete, unambiguous match; otherwise DeskPill brings the browser forward. It needs no browser extension or debugging port. [Matching details and limits](docs/MEDIA.md).
@@ -85,14 +100,16 @@ You need Windows, .NET Framework 4.8 and Windows SDK metadata (`Windows.winmd`).
 ```powershell
 .\build.ps1            # Compile to bin/DeskPill.exe
 .\build.ps1 -Test      # Build and run all test suites
-.\package.ps1          # Create dist/DeskPill-1.5.1-portable.zip
+.\package.ps1          # Create dist/DeskPill-2.0.0-portable.zip
 ```
 
 The solution is also available as `DeskPill.sln`. Full UI, media and OCR probes require an interactive Windows desktop; CI runs the deterministic suites. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Privacy and optional services
 
-Settings and local state live in `%LOCALAPPDATA%\DeskPill`. File shelf entries store paths; removing one does not delete its file. Clipboard persistence is **off by default**. Notification text stays in memory.
+Settings and local state live in `%LOCALAPPDATA%\DeskPill`. File shelf entries store paths; removing one does not delete its file. Clipboard persistence is **off by default**. Notification text stays in memory. Agent connection profiles store tool and project paths; DeskPill does not persist agent drafts, responses or session identifiers.
+
+Agent prompts and project context go to the selected CLI and its configured provider when you press Send. DeskPill does not read provider credentials or grant requested permissions.
 
 Ask sends submitted prompts to Google when you configure your own Gemini key; the saved key uses Windows DPAPI for the current user. Weather, calendar URLs, lyrics and other online tools contact their respective services when used. Offline arithmetic does not require a key. No accounts, keys, personal state or telemetry configuration are included in this repository.
 

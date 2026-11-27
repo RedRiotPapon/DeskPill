@@ -19,7 +19,8 @@ namespace DeskPill
         DropTarget,
         InlineAsk,
         InlineToday,
-        InlineLyrics
+        InlineLyrics,
+        InlineAgents
     }
 
     // - Open:      stiffness=300, damping=25.63 (zeta ~0.74, crisp bloom with subtle overshoot)
@@ -43,6 +44,7 @@ namespace DeskPill
         internal const double InlineAskHeight = 228.0;
         internal const double InlineTodayHeight = 238.0;
         internal const double InlineLyricsHeight = 238.0;
+        internal const double InlineAgentsHeight = 238.0;
         internal const double FloatingTopOffset = 10.0;
 
         readonly Path shell;

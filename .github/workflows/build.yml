@@ -15,7 +15,7 @@ jobs:
       - name: Deterministic tests
         shell: pwsh
         run: |
-          foreach ($suite in @('domain','integrations','notifications','dictation','gaming','media')) {
+          foreach ($suite in @('domain','agents','integrations','notifications','dictation','gaming','media')) {
             & "./tests/$suite.ps1"
             if ($LASTEXITCODE -ne 0) { throw "Failed: $suite" }
           }

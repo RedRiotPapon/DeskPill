@@ -1,4 +1,4 @@
-# Contributing
+﻿# Contributing
 
 Build on Windows with .NET Framework 4.8 and Windows SDK metadata. Run `./build.ps1 -Test` before submitting a change. UI, media and OCR checks need an interactive desktop; CI runs the deterministic domain, parsing and notification inbox suites.
 
@@ -14,6 +14,7 @@ Useful commands:
 ./build.ps1
 ./build.ps1 -Test
 ./tests/domain.ps1
+./tests/agents.ps1
 ./tests/integrations.ps1
 ./tests/notifications.ps1
 ./scripts/measure-motion.ps1
@@ -28,3 +29,5 @@ Run motion measurements alone on an idle interactive desktop. They record WPF ca
 Optional speech verification: after installing the English pack in Settings, run `./scripts/test-dictation-speech.ps1`. It synthesizes an English fixture with a Windows TTS voice and runs DeskPill's independent speech worker without microphone or clipboard access. `-Install` explicitly downloads the pack if missing. `./tests/dictation.ps1` covers bounded WAV encoding, shortcut state, cancellation and checksum guards without downloading assets.
 
 Game-mode checks: `./tests/gaming.ps1` exercises detection and presentation-CSV filtering without tracing. `./scripts/test-game-fps.ps1` uses its own rendering fixture; `-Install` opts into downloading PresentMon. Positive FPS needs Windows ETW trace access. UI changes should verify Classic, Glass at multiple opacities, motion preview/cancel/reset, native input pass-through and theme restoration.
+
+Agent integration changes must use isolated fixtures for quoting, output bounds, resume, cancellation and owned process cleanup. Do not run billable model calls as unattended tests. Keep CLI session control distinct from manual app shortcuts.

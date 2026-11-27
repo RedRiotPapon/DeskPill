@@ -1,6 +1,6 @@
-# DeskPill 1.5
+﻿# DeskPill 2.0
 
-Native Windows desktop notch with Music, Shelf, Focus, Water and Tasks. Hide unused pages without deleting their data. Classic, Glass, seven colored skins and a Custom palette support live preview.
+Native Windows desktop notch with Music, Shelf, Focus, Water, Tasks and Agents. Hide unused pages without deleting their data. Classic, Glass, seven colored skins and a Custom palette support live preview.
 
 Windows notification previews offer Open app, Copy and Recent actions. Esc dismisses a preview without activating DeskPill; unattended previews expire after a configurable two to fifteen seconds, with hover pausing the countdown. Recent retains up to 50 arrivals in memory. Per-app, focus and fullscreen preferences control peeks. Deferred previews coalesce to the newest eligible arrival. Opening a source launches its registered app, not a specific message.
 
@@ -15,3 +15,5 @@ Settings → Motion provides opening/options delays, closing grace and spring pa
 Game mode is available from the tray right-click menu and switches temporarily to compact, input-transparent Glass at 22% shell opacity while the foreground game matches a saved executable or fullscreen graphics heuristic. FPS is measured from PresentMon presentation intervals. Windows trace access is required; the current non-elevated test session verified the unavailable state, not live game FPS. With Game mode off, matching games tuck the notch into its tiny state without FPS capture. The saved theme and pointer behavior restore on game exit.
 
 Music artwork/title opens its source app or a uniquely matched accessible browser tab. Chrome, Edge, Brave, Vivaldi, Opera, Firefox and Chromium source IDs are handled; live matching was checked read-only in Chrome. Volume uses a continuous, timed flyout with background audio writes and ordered mute actions. See [music behavior and limits](MEDIA.md).
+
+Agents Home is a separate default-visible page, removable through Settings → Pages. Connection profiles select a tool and workspace; text and reviewed optional voice prompts run through Codex CLI, Claude Code or Gemini CLI in owned sessions, with follow-up, bounded responses, status and Stop. Review-only is default; Codex project writes are explicit opt-in. CLI sign-in and billing belong to the selected tool. App shortcut supports manual copy/open, without access to existing IDE, cloud or terminal conversations. Native `.exe` installations are supported; npm shims are not. Drafts, output and session UUIDs remain in memory. Closing DeskPill stops its owned process trees. Protocol, UI dispatch and process containment were tested using isolated fake CLIs; real provider calls and live microphone-to-agent dispatch were not performed. See [agent connection details](AGENTS.md).

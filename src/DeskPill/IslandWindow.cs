@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -18,7 +18,7 @@ using Forms = System.Windows.Forms;
 
 namespace DeskPill
 {
-    public sealed class IslandWindow : Window
+    public sealed partial class IslandWindow : Window
     {
         Settings preferencesPreview;
         int motionDemoRevision;
@@ -209,7 +209,8 @@ namespace DeskPill
             { "Shelf", "\uE8B7" },
             { "Focus", "\uE916" },
             { "Water", "\uEB42" },
-            { "Tasks", "\uE73A" }
+            { "Tasks", "\uE73A" },
+            { "Agents", "\uE8F2" }
         };
 
         public IslandWindow(AppState state, StateStore store, bool preview, bool capture)
@@ -320,6 +321,9 @@ namespace DeskPill
             {
                 if (e.Key == Key.Escape)
                 {
+                    if(agentPicker!=null&&agentPicker.IsDropDownOpen){agentPicker.IsDropDownOpen=false;e.Handled=true;return;}
+                    if(agentHomePicker!=null&&agentHomePicker.IsDropDownOpen){agentHomePicker.IsDropDownOpen=false;e.Handled=true;return;}
+                    if(agentSpeech!=null){CancelAgentVoice();e.Handled=true;return;}
                     if(volumeFlyout!=null && volumeFlyout.IsOpen){CloseVolumeMenu();e.Handled=true;return;}
                     if (pose == NotchPose.NotificationPeek) { DismissNotification(); e.Handled = true; return; }
                     if (IsInlinePose(pose))
@@ -521,7 +525,7 @@ namespace DeskPill
 
         static bool IsInlinePose(NotchPose p)
         {
-            return p == NotchPose.InlineAsk || p == NotchPose.InlineToday || p == NotchPose.InlineLyrics;
+            return p == NotchPose.InlineAsk || p == NotchPose.InlineToday || p == NotchPose.InlineLyrics || p == NotchPose.InlineAgents;
         }
 
         bool CanAutoClose()
@@ -530,6 +534,7 @@ namespace DeskPill
                 return false;
             if (IsInlinePose(pose))
             {
+                if (pose==NotchPose.InlineAgents)return false;
                 if (inlineAskBusy)
                     return false;
                 if (inlineAskInput != null && inlineAskInput.IsKeyboardFocusWithin)
@@ -773,6 +778,10 @@ namespace DeskPill
                 w = 432.0;
                 h = IslandMotion.DropTargetHeight;
                 showDock = false;
+            }
+            else if (targetPose == NotchPose.InlineAgents)
+            {
+                w=484;h=IslandMotion.InlineAgentsHeight;showDock=false;
             }
             else if (targetPose == NotchPose.InlineAsk)
             {
@@ -1204,6 +1213,7 @@ namespace DeskPill
 
         void SetOpen(bool value)
         {
+            if(!value && pose==NotchPose.InlineAgents)PreserveAgentDraft();
             if(!value)CloseVolumeMenu();
             if(value && dictation!=null && dictation.Active)dictation.Cancel();
             if(value && gameDetected){SetGameMode(new GameWindow());if(!IsVisible && IsLoaded)Show();}
@@ -1696,6 +1706,7 @@ namespace DeskPill
             };
             rightSlot.Children.Add(compactEq);
             rightSlot.Children.Add(compactMascot);
+            agentIndicator=new System.Windows.Shapes.Ellipse{Width=4,Height=4,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Bottom,Margin=new Thickness(0,0,-2,0),Visibility=Visibility.Collapsed,IsHitTestVisible=false};rightSlot.Children.Add(agentIndicator);
             Grid.SetColumn(rightSlot, 2);
             compact.Children.Add(rightSlot);
 
@@ -1885,7 +1896,7 @@ namespace DeskPill
 
         static Brush PageAccent(string name)
         {
-            return name == "Music" ? Ui.Hex("#FF375F") : name == "Focus" ? Ui.Hex("#9160FF")
+            return name == "Agents" ? Ui.Hex("#9CD4FF") : name == "Music" ? Ui.Hex("#FF375F") : name == "Focus" ? Ui.Hex("#9160FF")
                 : name == "Water" ? Ui.Hex("#279DFF") : name == "Shelf" ? Ui.Hex("#E7BE54") : Ui.Hex("#56DE9A");
         }
 
@@ -1947,6 +1958,10 @@ namespace DeskPill
                 titleFirstRun.Text = "To";
                 titleSecondRun.Text = "day";
             }
+            else if (pose == NotchPose.InlineAgents)
+            {
+                titleFirstRun.Text="Agents ";titleSecondRun.Text="Home";
+            }
             else if (pose == NotchPose.InlineLyrics)
             {
                 titleFirstRun.Text = "Track";
@@ -1954,7 +1969,7 @@ namespace DeskPill
             }
             else
             {
-                titleFirstRun.Text = page == "Tasks" ? "Todo" : page == "Music" ? "" : page == "Shelf" ? "Shelf" : page == "Focus" ? "Pomodoro" : "Water";
+                titleFirstRun.Text = page == "Tasks" ? "Todo" : page == "Music" ? "" : page == "Shelf" ? "Shelf" : page == "Focus" ? "Pomodoro" : page=="Agents" ? "Agents" : "Water";
                 titleSecondRun.Text = page == "Tasks" ? "List" : "";
             }
             if (headerRow != null && !IsInlinePose(pose))
@@ -2002,6 +2017,7 @@ namespace DeskPill
 
         void RebuildCurrentPage(bool preserveDock)
         {
+            agentPageStatus=null;agentPageSummary=null;agentPageAction=null;agentHomePicker=null;
             CloseVolumeMenu();
             if (!Order().Contains(page)) page=Order()[0];
             if (currentPageVisual != null)
@@ -2033,6 +2049,8 @@ namespace DeskPill
                 BuildShelf(currentPageVisual);
             else if (page == "Focus")
                 BuildFocus(currentPageVisual);
+            else if (page == "Agents")
+                BuildAgents(currentPageVisual);
             else if (page == "Water")
                 BuildWater(currentPageVisual);
             else
@@ -2554,7 +2572,7 @@ namespace DeskPill
             inlineHost.IsHitTestVisible = inlineMode;
             if (headerRow != null)
             {
-                double hw = pose == NotchPose.InlineAsk ? 412.0 : (pose == NotchPose.InlineToday || pose == NotchPose.InlineLyrics) ? 436.0 : 340.0;
+                double hw = pose == NotchPose.InlineAsk ? 412.0 : (pose == NotchPose.InlineToday || pose == NotchPose.InlineLyrics || pose == NotchPose.InlineAgents) ? 436.0 : 340.0;
                 headerRow.Width = hw;
                 Canvas.SetLeft(headerRow, (IslandMotion.CanvasWidth - hw) * 0.5);
             }
@@ -2564,6 +2582,8 @@ namespace DeskPill
 
         void HideInlineHost()
         {
+            PreserveAgentDraft();
+            agentPrompt=null;agentResult=null;agentSend=null;agentVoice=null;agentStop=null;agentPicker=null;agentWave=null;agentDetailStatus=null;
             inlineAskInput = null;
             inlineAskOutput = null;
             inlineTranslateLang = null;
@@ -2596,7 +2616,7 @@ namespace DeskPill
         void ShowInlineView(NotchPose targetPose, double width, UIElement body)
         {
             double panelW = width - 48.0;
-            double h = targetPose == NotchPose.InlineAsk ? IslandMotion.InlineAskHeight : targetPose == NotchPose.InlineToday ? IslandMotion.InlineTodayHeight : IslandMotion.InlineLyricsHeight;
+            double h = targetPose == NotchPose.InlineAsk ? IslandMotion.InlineAskHeight : targetPose == NotchPose.InlineToday ? IslandMotion.InlineTodayHeight : targetPose == NotchPose.InlineAgents ? IslandMotion.InlineAgentsHeight : IslandMotion.InlineLyricsHeight;
             inlineHost.Width = panelW;
             inlineHost.Height = h - 56.0;
             inlineHost.Child = body;
@@ -3120,6 +3140,7 @@ namespace DeskPill
                 ring.ToolTip = gameModeActive?(gameCapture==null?"Game glass":gameCapture.Status):sourceName + " · " + (Math.Max(0, Math.Min(1, progress))*100).ToString("0") + "%";
             }
 
+            UpdateAgentIndicator();
             bool isPlaying = media.Current.Playing && !gameModeActive;
             if (compactEq != null)
                 compactEq.Playing = isPlaying;
@@ -3710,6 +3731,7 @@ namespace DeskPill
 
         void Cleanup()
         {
+            CleanupAgents();
             CloseVolumeMenu();
             if(volumeWriter!=null){volumeWriter.Dispose();volumeWriter=null;}
             if(gameCapture!=null){try{gameCapture.StopAsync().Wait(2000);}catch(AggregateException){}gameCapture=null;}

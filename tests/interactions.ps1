@@ -5,6 +5,8 @@ $runDirectory=Join-Path $env:TEMP ('DeskPill-InteractionTests-'+[Guid]::NewGuid(
 New-Item -ItemType Directory -Path $runDirectory | Out-Null
 try {
  Copy-Item -LiteralPath (Join-Path $root 'bin/DeskPill.exe') -Destination $runDirectory
+ & (Join-Path $framework 'csc.exe') /nologo /target:exe ('/out:'+(Join-Path $runDirectory 'AgentFixture.exe')) (Join-Path $root 'tools/AgentFixture.cs')
+ if($LASTEXITCODE -ne 0){throw 'Agent fixture compilation failed'}
  $output=Join-Path $runDirectory 'InteractionTests.exe'
  $arguments=@('/nologo','/target:exe','/langversion:5',('/out:'+$output),('/r:'+(Join-Path $runDirectory 'DeskPill.exe')),'/r:System.dll','/r:System.Core.dll','/r:System.Xaml.dll')
  foreach($assembly in @('WindowsBase','PresentationCore','PresentationFramework')) { $arguments+='/r:'+(Join-Path $framework ('WPF/'+$assembly+'.dll')) }

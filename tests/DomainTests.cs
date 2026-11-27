@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using DeskPill;
 
 class DomainTests
@@ -72,7 +73,7 @@ class DomainTests
                 "Bogus"
             };
             a.Normalize(t);
-            Check(string.Join(",", a.Settings.PageOrder) == "Tasks,Music,Shelf,Focus,Water", "page order repairs malformed entries");
+            Check(string.Join(",", a.Settings.PageOrder) == "Tasks,Music,Shelf,Focus,Water,Agents", "page order repairs malformed entries");
             var dir = Path.Combine(Path.GetTempPath(), "DeskPill-test-" + Guid.NewGuid());
             Directory.CreateDirectory(dir);
             try
@@ -81,6 +82,8 @@ class DomainTests
                 a.Tasks.Add(new TodoItem { Id = "task", Title = "Keep me", StartsAt = t });
                 a.Shelf.Add("C:\\example.txt");
                 a.Clipboard.Add("private text");
+                a.Agents.Add(new AgentProfile{Name="Project helper",Workspace="D:\\demo",Executable="C:\\codex.exe"});a.SelectedAgent=a.Agents[0].Id;
+                a.Settings.HiddenPages=new[]{"Agents"};
                 store.Save(a);
                 var disk = File.ReadAllText(Path.Combine(dir, "state.json"));
                 Check(!disk.Contains("private text") && a.Clipboard.Count == 1, "clipboard opt out preserves live history");
@@ -90,6 +93,7 @@ class DomainTests
                 Check(store.Load().FocusPhase == "Focus", "legacy state saves with timer defaults");
                 store.Save(a);
                 var b = store.Load();
+                Check(b.Agents.Count==1 && b.SelectedAgent==a.SelectedAgent && !b.Settings.VisiblePages().Contains("Agents"),"Connections and hidden Agents page survive JSON roundtrip");
                 Check(b.Tasks.Count == 1 && b.Tasks[0].Title == "Keep me" && b.Shelf.Count == 1, "task and shelf JSON roundtrip");
                 Check(Settings.ThemeNames.Length == 10 && Settings.ThemeNames[0]=="Classic" && Settings.ThemeNames[1]=="Glass", "Classic stays default, followed by Glass, seven skins and Custom");
                 Check(Settings.NormalizeTheme("Matcha") == "Ghibli Meadow" && Settings.NormalizeTheme("Sakura Dawn") == "Sakura Shrine", "previous palette preferences migrate to refined skins");
@@ -137,8 +141,15 @@ class DomainTests
                 Directory.Delete(cleanup, true);
             }
 
+            var agentsState=new AppState();agentsState.Settings.PageOrder=new[]{"Music","Shelf","Focus","Water","Tasks"};agentsState.Normalize(DateTime.Now);
+            Check(agentsState.Settings.VisiblePages().Last()=="Agents","Upgraded installs add Agents without reordering existing pages");
+            agentsState.Agents.Add(new AgentProfile{Name="My Codex",Provider="Codex CLI",Workspace="D:\\demo",Executable="C:\\codex.exe"});agentsState.SelectedAgent=agentsState.Agents[0].Id;
+            agentsState.Settings.HiddenPages=new[]{"Agents"};agentsState.Normalize(DateTime.Now);
+            Check(!agentsState.Settings.VisiblePages().Contains("Agents") && agentsState.Agents.Count==1,"Hiding Agents retains connections");
+            agentsState.Agents.Add(new AgentProfile{Id=agentsState.SelectedAgent,Provider="unknown",AllowEdits=true,Name=new string('x',100)});agentsState.Normalize(DateTime.Now);
+            Check(agentsState.Agents.Select(x=>x.Id).Distinct().Count()==2 && agentsState.Agents[1].Provider=="App shortcut" && !agentsState.Agents[1].AllowEdits && agentsState.Agents[1].Name.Length==60,"Malformed agent profiles repair without granting permissions");
             var visibility=new AppState();visibility.Settings.HiddenPages=new[]{"Water","Focus","unknown","Water"};visibility.Normalize(DateTime.Now);
-            Check(string.Join(",",visibility.Settings.VisiblePages())=="Music,Shelf,Tasks","hidden pages filter navigation without changing order");
+            Check(string.Join(",",visibility.Settings.VisiblePages())=="Music,Shelf,Tasks,Agents","hidden pages filter navigation without changing order");
             visibility.Settings.HiddenPages=visibility.Settings.PageOrder;visibility.Normalize(DateTime.Now);
             Check(visibility.Settings.VisiblePages().Length==1 && visibility.Settings.VisiblePages()[0]=="Music","malformed all-hidden state retains one page");
             visibility.Settings.NotificationSeconds=90;visibility.Settings.MutedNotificationApps=new[]{"APP","app",""};visibility.Normalize(DateTime.Now);

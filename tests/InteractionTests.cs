@@ -40,7 +40,78 @@ class InteractionTests {
   Dispatcher.PushFrame(frame);limit.Stop();Check(task.IsCompleted,"Native UI Automation did not finish within its fixture deadline");task.GetAwaiter().GetResult();
  }
  [STAThread] static int Main() {
-  var app=new Application {ShutdownMode=ShutdownMode.OnExplicitShutdown};Ui.Init(app);
+  var app=new Application {ShutdownMode=ShutdownMode.OnExplicitShutdown};Ui.Init(app);System.Threading.SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(app.Dispatcher));
+  Test("Agents is separate and creates no runtime while using Music",delegate {
+   var w=Island();Check(Field(w,"agentHub")==null && Convert.ToString(Field(w,"page"))=="Music","Music started agent work");
+   Call(w,"SelectPage","Agents");Check(Controls<Button>(w).Any(b=>Convert.ToString(b.Content)=="Connect agent"),"Agents onboarding has no connect action");
+   Check(Field(w,"agentHub")==null,"Empty Agents page started a runtime");Call(w,"HideAgentsPage");
+   var state=(AppState)Field(w,"state");Check(!state.Settings.VisiblePages().Contains("Agents"),"Hide left Agents in navigation");
+   state.Settings.HiddenPages=new string[0];Call(w,"SelectPage","Agents");Check(Convert.ToString(Field(w,"page"))=="Agents","Agents could not be reenabled");Call(w,"Cleanup");
+  });
+  Test("Agent target changes preserve separate drafts and pointer exit never discards the editor",delegate {
+   var w=Island();var state=(AppState)Field(w,"state");var a=new AgentProfile{Name="First project"};var b=new AgentProfile{Name="Second project"};state.Agents.Add(a);state.Agents.Add(b);
+   Call(w,"SelectPage","Agents");Call(w,"ShowAgentConversation",a.Id);var first=(TextBox)Field(w,"agentPrompt");first.Text="Keep this draft";
+   Check(!(bool)typeof(IslandWindow).GetMethod("CanAutoClose",Private).Invoke(w,null),"Hover exit can discard a conversation");
+   ((ComboBox)Field(w,"agentPicker")).SelectedItem=b;((TextBox)Field(w,"agentPrompt")).Text="Second draft";Call(w,"ShowAgentConversation",a.Id);
+   Check(((TextBox)Field(w,"agentPrompt")).Text=="Keep this draft","Switching target lost draft");first.Text="Old detached control";
+   Check(((AgentHub)Field(w,"agentHub")).Get(b.Id).Draft=="Second draft","Detached input overwrote another target");
+   Call(w,"SetOpen",false);Call(w,"ShowAgentConversation",b.Id);Check(((TextBox)Field(w,"agentPrompt")).Text=="Second draft","Closing lost draft");Call(w,"Cleanup");
+  });
+  Test("Invalid agent launch keeps draft and displays an actionable error without starting",delegate {
+   var w=Island();var state=(AppState)Field(w,"state");var a=new AgentProfile{Name="Unavailable tool",Executable="C:\\missing.exe",Workspace="C:\\missing"};state.Agents.Add(a);
+   Call(w,"ShowAgentConversation",a.Id);var input=(TextBox)Field(w,"agentPrompt");input.Text="Do not lose me";Call(w,"SendAgentPrompt");
+   Check(input.Text=="Do not lose me" && !((AgentHub)Field(w,"agentHub")).Get(a.Id).Running,"Invalid launch cleared draft or ran a process");
+   Check(((TextBlock)Field(w,"agentDetailStatus")).Text.Contains("existing"),"Invalid path has no useful error");Call(w,"Cleanup");
+  });
+  Test("Agent Send shows a real fixture response without moving the shell or replacing a newer draft",delegate {
+   var w=Island();try{
+    var state=(AppState)Field(w,"state");var a=new AgentProfile{Name="Fixture project",Executable=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"AgentFixture.exe"),Workspace=AppDomain.CurrentDomain.BaseDirectory};state.Agents.Add(a);
+    Call(w,"SelectPage","Agents");Call(w,"ShowAgentConversation",a.Id);var input=(TextBox)Field(w,"agentPrompt");input.Text="hello fixture";Call(w,"SnapPoseImmediate");
+    var bounds=((System.Windows.Shapes.Path)Field(w,"shell")).Data.Bounds;Controls<Button>(w).Single(b=>Convert.ToString(b.Content)=="Send").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));input.Text="My next question";
+    var hub=(AgentHub)Field(w,"agentHub");var frame=new DispatcherFrame();var poll=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(20)};int ticks=0;
+    poll.Tick+=delegate{if(!hub.Get(a.Id).Running||++ticks>200)frame.Continue=false;};poll.Start();Dispatcher.PushFrame(frame);poll.Stop();Call(w,"RefreshAgentViews");
+    Check(!hub.Get(a.Id).Running&&hub.Get(a.Id).Status=="Done"&&((TextBox)Field(w,"agentResult")).Text.Contains("fixture answer"),"Send did not surface fixture response");
+    Check(input.Text=="My next question","Completion cleared a newer unsent draft");Call(w,"SnapPoseImmediate");Check(((System.Windows.Shapes.Path)Field(w,"shell")).Data.Bounds==bounds,"Streamed response resized the shell");
+    input.Text="hold";Call(w,"SendAgentPrompt");Check(hub.Get(a.Id).Running,"Owned run failed to start");Call(w,"RefreshAgentViews");Check(((FrameworkElement)Field(w,"agentIndicator")).Visibility==Visibility.Visible,"Working agent has no ambient indicator");Call(w,"HideAgentsPage");Call(w,"UpdateAgentIndicator");Check(((FrameworkElement)Field(w,"agentIndicator")).Visibility==Visibility.Collapsed,"Hidden Agents left ambient UI behind");Check(hub.Get(a.Id).Running && state.Agents.Count==1,"Hiding killed work or deleted connection");PumpUntil(hub.StopAsync(a.Id));Check(hub.Get(a.Id).Status=="Stopped","Stop did not reach stopped state");
+   }finally{Call(w,"Cleanup");}
+  });
+  Test("Completing a detached conversation cannot erase its newer stored draft",delegate {
+   var w=Island();try{
+    var state=(AppState)Field(w,"state");var a=new AgentProfile{Name="First",Executable=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"AgentFixture.exe"),Workspace=AppDomain.CurrentDomain.BaseDirectory};var b=new AgentProfile{Name="Second"};state.Agents.Add(a);state.Agents.Add(b);Call(w,"SelectPage","Agents");Call(w,"ShowAgentConversation",a.Id);
+    ((TextBox)Field(w,"agentPrompt")).Text="slow";Call(w,"SendAgentPrompt");Call(w,"ExitInlineView");Call(w,"ShowAgentConversation",a.Id);((TextBox)Field(w,"agentPrompt")).Text="A newer draft after reopening";Call(w,"ShowAgentConversation",b.Id);
+    var hub=(AgentHub)Field(w,"agentHub");var frame=new DispatcherFrame();var poll=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(20)};int ticks=0;poll.Tick+=delegate{if(!hub.Get(a.Id).Running||++ticks>200)frame.Continue=false;};poll.Start();Dispatcher.PushFrame(frame);poll.Stop();
+    Check(!hub.Get(a.Id).Running&&hub.Get(a.Id).Draft=="A newer draft after reopening","Completion erased a newer detached draft");Call(w,"ShowAgentConversation",a.Id);Check(((TextBox)Field(w,"agentPrompt")).Text=="A newer draft after reopening","Reopened draft disappeared");
+   }finally{Call(w,"Cleanup");}
+  });
+  Test("Agent keyboard selector has a themed popup and keeps the chosen target",delegate {
+   var w=Island();try{var state=(AppState)Field(w,"state");var a=new AgentProfile{Name="One"};var b=new AgentProfile{Name="Two"};state.Agents.Add(a);state.Agents.Add(b);Call(w,"SelectPage","Agents");Call(w,"ShowAgentConversation",a.Id);
+    var picker=(ComboBox)Field(w,"agentPicker");picker.ApplyTemplate();Check(picker.Template.FindName("PART_Popup",picker)!=null && picker.ItemContainerStyle!=null,"Connection picker lacks accessible dropdown structure");
+    picker.SelectedIndex=1;Check(Convert.ToString(Field(w,"agentDetailId"))==b.Id,"Selector did not switch prompt destination");
+   }finally{Call(w,"Cleanup");}
+  });
+  Test("Escape cancels agent speech without dispatching and then returns to the page",delegate {
+   var w=Island();var source=new HwndSource(new HwndSourceParameters("DeskPill agent key fixture"){Width=1,Height=1,WindowStyle=0});try{
+    var state=(AppState)Field(w,"state");var a=new AgentProfile{Name="Voice destination"};state.Agents.Add(a);Call(w,"SelectPage","Agents");Call(w,"ShowAgentConversation",a.Id);((TextBox)Field(w,"agentPrompt")).Text="Keep my draft";
+    var token=new System.Threading.CancellationTokenSource();w.GetType().GetField("agentSpeech",Private).SetValue(w,token);
+    w.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice,source,0,Key.Escape){RoutedEvent=Keyboard.PreviewKeyDownEvent});
+    Check(token.IsCancellationRequested&&Field(w,"agentSpeech")==null&&Convert.ToString(Field(w,"pose"))=="InlineAgents","Escape did not cancel speech in place");
+    Check(((TextBox)Field(w,"agentPrompt")).Text=="Keep my draft"&&!((AgentHub)Field(w,"agentHub")).Get(a.Id).Running,"Speech cancellation changed draft or dispatched");
+    w.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice,source,0,Key.Escape){RoutedEvent=Keyboard.PreviewKeyDownEvent});Check(Convert.ToString(Field(w,"pose"))=="Expanded","Second Escape did not return to page");
+   }finally{source.Dispose();Call(w,"Cleanup");}
+  });
+  Test("Agent home destination stays synchronized after returning from another conversation",delegate {
+   var w=Island();try{var state=(AppState)Field(w,"state");var a=new AgentProfile{Name="First"};var b=new AgentProfile{Name="Second"};state.Agents.Add(a);state.Agents.Add(b);state.SelectedAgent=a.Id;Call(w,"SelectPage","Agents");Call(w,"ShowAgentConversation",a.Id);((ComboBox)Field(w,"agentPicker")).SelectedItem=b;Call(w,"ExitInlineView");
+    Check(((ComboBox)Field(w,"agentHomePicker")).SelectedItem==b,"Home displays a different destination than its action");
+   }finally{Call(w,"Cleanup");}
+  });
+  Test("Changing an existing connection provider replaces the old executable and clears edit permission",delegate {
+   var original=new AgentProfile{Name="Existing",Executable="C:\\old-provider.exe",AllowEdits=true};var type=typeof(IslandWindow).Assembly.GetType("DeskPill.AgentConnectionWindow");var editor=(Window)Activator.CreateInstance(type,new object[]{original});
+   try{var provider=(ComboBox)Field(editor,"provider");provider.SelectedItem="App shortcut";Check(((TextBox)Field(editor,"executable")).Text=="" && ((CheckBox)Field(editor,"edits")).IsChecked==false,"Provider switch retained old executable or writes");provider.SelectedItem="Claude Code";Check(((TextBox)Field(editor,"executable")).Text==AgentTools.FindExecutable("Claude Code"),"New provider was not detected");}finally{editor.Close();}
+  });
+  Test("Agent refresh coalesces worker events before entering the dispatcher",delegate {
+   var w=Island();for(int i=0;i<10000;i++)Call(w,"QueueAgentRefresh");
+   Check((int)Field(w,"agentRefreshQueued")==1,"Worker events were not coalesced before dispatcher posting");Call(w,"Cleanup");
+  });
   Test("Music source navigation has a dedicated clickable track control",delegate {
    var w=Island();var service=(MediaService)Field(w,"media");service.Current=new MediaSnapshot {Source="chrome.exe",Title="An example song",Artist="An artist"};Call(w,"RebuildCurrentPage",true);
    Check(Controls<Button>(w).Any(b=>Convert.ToString(b.ToolTip)=="Open playing app or browser tab"),"Track source has no keyboard-accessible action");Call(w,"Cleanup");
@@ -259,7 +330,7 @@ class InteractionTests {
    Check(!(bool)Field(w,"gameModeActive") && (bool)Field(w,"open") && Themes.Current=="Classic","Explicit controls stayed in game mode");Call(w,"Cleanup");
   });
   Test("Hidden pages disappear from carousel, dots and dock",delegate {
-   var state=new AppState();state.Settings.HiddenPages=new[]{"Music","Water","Focus","Shelf"};state.Settings.FastAnimations=true;
+   var state=new AppState();state.Settings.HiddenPages=new[]{"Music","Water","Focus","Shelf","Agents"};state.Settings.FastAnimations=true;
    var w=new IslandWindow(state,new StateStore(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"hidden-fixture")),true,true);
    try {
     Check(Convert.ToString(Field(w,"page"))=="Tasks","Hidden startup page stayed selected");
@@ -275,7 +346,7 @@ class InteractionTests {
     Controls<Button>(settings).Single(b=>Convert.ToString(b.Content)=="Pages").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
     Controls<CheckBox>(settings).Single(c=>Convert.ToString(c.Content)=="Water").IsChecked=false;
     Controls<Button>(settings).Single(b=>Convert.ToString(b.Content)=="Save changes").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-    var dock=(Border)Field(w,"dockTray");Check(dock.Width==156 && Math.Abs(((TranslateTransform)dock.RenderTransform).Y)<.01 && dock.Opacity==1,"Rebuilt dock was offset or hidden after Save");
+    var dock=(Border)Field(w,"dockTray");Check(dock.Width==184 && Math.Abs(((TranslateTransform)dock.RenderTransform).Y)<.01 && dock.Opacity==1,"Rebuilt dock was offset or hidden after Save");
     Check(Convert.ToString(Field(w,"pose"))=="OptionsDock","Settings collapsed the open dock");
    } finally {settings.Close();Call(w,"Cleanup");}
   });
@@ -354,7 +425,7 @@ class InteractionTests {
    var w=Island();double width=((System.Windows.Shapes.Path)Field(w,"shell")).Data.Bounds.Width;
    Call(w,"SetPose",NotchPose.OptionsDock);double dockWidth=((System.Windows.Shapes.Path)Field(w,"shell")).Data.Bounds.Width;
    Check(Math.Abs(width-dockWidth)<0.1,"Options moved the page edges sideways");
-   Check(Controls<Button>((DependencyObject)Field(w,"dockTray")).Count()==6,"Expected five page icons and Settings");Call(w,"Cleanup");
+   Check(Controls<Button>((DependencyObject)Field(w,"dockTray")).Count()==7,"Expected six page icons and Settings");Call(w,"Cleanup");
   });
   Test("Brief pointer passes do not open the notch; a relaxed dwell does",delegate {
    var w=Island();Call(w,"SetOpen",false);var now=DateTime.UtcNow;
