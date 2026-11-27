@@ -45,6 +45,17 @@ class InteractionTests {
    var w=Island();var service=(MediaService)Field(w,"media");service.Current=new MediaSnapshot {Source="chrome.exe",Title="An example song",Artist="An artist"};Call(w,"RebuildCurrentPage",true);
    Check(Controls<Button>(w).Any(b=>Convert.ToString(b.ToolTip)=="Open playing app or browser tab"),"Track source has no keyboard-accessible action");Call(w,"Cleanup");
   });
+  Test("Focusing the music source never leaves a persistent template border",delegate {
+   var w=Island();w.GetType().GetProperty("RuntimeProbeMode",Private).SetValue(w,true,null);
+   try {
+    ((MediaService)Field(w,"media")).Current=new MediaSnapshot{Title="Example song",Source="Chrome"};Call(w,"RebuildCurrentPage",true);w.Show();w.Activate();
+    var button=Controls<Button>(w).Single(b=>Convert.ToString(b.ToolTip)=="Open playing app or browser tab");button.Focus();w.UpdateLayout();
+    Check(button.IsKeyboardFocused,"Focus fixture did not reach the track control");
+    var outline=(Border)button.Template.FindName("outline",button);
+    Check(outline.BorderThickness==new Thickness(0),"Mouse/programmatic focus left a permanent music border");
+    Check(button.FocusVisualStyle!=null,"Keyboard navigation lost its focus feedback");
+   }finally{Call(w,"Cleanup");w.Hide();}
+  });
   Test("Volume flyout uses a continuous slider and closes after idle",delegate {
    var type=typeof(IslandWindow).Assembly.GetType("DeskPill.VolumeFlyout");Check(type!=null,"Volume still uses an untimed context menu");
    int closed=0;var flyout=Activator.CreateInstance(type,new object[]{.5f,false,new Action<float>(delegate{}),new Action(delegate{}),new Action(()=>closed++)});

@@ -2132,7 +2132,9 @@ namespace DeskPill
                 Cursor = Cursors.Hand,
                 IsEnabled = current.HasMedia && !string.IsNullOrWhiteSpace(current.Source),
                 ToolTip = "Open playing app or browser tab",
-                Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Border x:Name='outline' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' Background='{TemplateBinding Background}' CornerRadius='12' BorderThickness='0' BorderBrush='{DynamicResource DeskPillAccent}'><ContentPresenter/></Border><ControlTemplate.Triggers><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='outline' Property='BorderThickness' Value='1'/></Trigger></ControlTemplate.Triggers></ControlTemplate>")
+                // Focus visuals are keyboard-only; IsKeyboardFocused also persists after mouse clicks.
+                FocusVisualStyle = (Style)System.Windows.Markup.XamlReader.Parse(@"<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Control'><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='Control'><Border BorderBrush='{DynamicResource DeskPillAccent}' BorderThickness='1' CornerRadius='12' IsHitTestVisible='False'/></ControlTemplate></Setter.Value></Setter></Style>"),
+                Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Border x:Name='outline' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' Background='{TemplateBinding Background}' CornerRadius='12' BorderThickness='0' BorderBrush='{DynamicResource DeskPillAccent}'><ContentPresenter/></Border></ControlTemplate>")
             };
             System.Windows.Automation.AutomationProperties.SetName(sourceAction, current.HasMedia ? "Open " + current.Title + " in its source app" : "No media source available");
             sourceAction.Click += delegate
