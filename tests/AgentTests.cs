@@ -29,10 +29,15 @@ class AgentTests {
  for(int i=0;i<100;i++)AgentTools.ApplyEvent(s,"Gemini CLI","{\"type\":\"message\",\"role\":\"assistant\",\"content\":\""+new string('x',1000)+"\"}");Check(s.Output.Length<=16384,"bounded output");
  using(var hub=new AgentHub()){
  var t=hub.SendAsync(p,"hello fixture");t.Wait(10000);Check(t.IsCompleted&&hub.Get(p.Id).Status=="Done","fixture completes");Check(hub.Get(p.Id).Output.Contains("fixture answer"),"fixture output");Check(hub.Get(p.Id).SessionId=="12345678-1234-1234-1234-123456789abc","owned session");
- Check(hub.Reset(p.Id)&&hub.Get(p.Id).SessionId==""&&hub.Get(p.Id).Output=="","new conversation clears only owned context");
+ t=hub.SendAsync(p,"mcp-warning");Check(t.Wait(10000)&&hub.Get(p.Id).Status=="Done","connector warnings do not turn a successful reply into failure");Check(hub.Get(p.Id).Output.Contains("fixture answer")&&!hub.Get(p.Id).Output.Contains("AuthRequired"),"CLI stderr must not contaminate assistant reply");
+ Check(hub.Get(p.Id).Diagnostics.Contains("AuthRequired"),"connector diagnostics remain available separately");
+ Check(hub.Reset(p.Id)&&hub.Get(p.Id).SessionId==""&&hub.Get(p.Id).Output==""&&hub.Get(p.Id).Diagnostics=="","new conversation clears only owned context");
  t=hub.SendAsync(p,"hold");Thread.Sleep(300);Check(!hub.Reset(p.Id),"cannot reset active conversation");var duplicate=hub.SendAsync(p,"duplicate");Check(duplicate.IsCompleted,"duplicate refused");hub.StopAsync(p.Id).Wait(10000);Check(hub.Get(p.Id).Status=="Stopped"&&!hub.Get(p.Id).Running,"stop owned process");
  t=hub.SendAsync(p,"flood");Check(t.Wait(10000),"flood completes");Check(hub.Get(p.Id).Output.Length<=16384,"flood bounded");
- t=hub.SendAsync(p,"fail");Check(t.Wait(10000)&&hub.Get(p.Id).Status=="Needs attention","nonzero attention");
+ t=hub.SendAsync(p,"diagnostic-flood");Check(t.Wait(10000)&&hub.Get(p.Id).Diagnostics.Length<=16384&&hub.Get(p.Id).Diagnostics.Length>0&&!hub.Get(p.Id).Output.Contains("dddd"),"bounded diagnostics drain separately under a flood");
+ t=hub.SendAsync(p,"unterminated-diagnostic");Check(t.Wait(10000)&&hub.Get(p.Id).Diagnostics=="Tool diagnostic without newline","last diagnostic line is kept without newline");
+ t=hub.SendAsync(p,"hello fixture");Check(t.Wait(10000)&&hub.Get(p.Id).Diagnostics=="","new run clears old diagnostics");
+ t=hub.SendAsync(p,"fail");Check(t.Wait(10000)&&hub.Get(p.Id).Status=="Needs attention"&&hub.Get(p.Id).Diagnostics.Contains("Fixture authentication failed"),"failed run keeps actionable diagnostics");
  t=hub.SendAsync(p,"tree");int child=Child(hub,p.Id);Check(child>0,"fixture child started");hub.StopAsync(p.Id).Wait(10000);Check(Exited(child),"stop kills descendants");
  t=hub.SendAsync(p,"treeexit");Check(t.Wait(10000),"parent exits with child");child=Child(hub,p.Id);Check(child>0&&Exited(child),"parent completion kills remaining descendants");
  p.Provider="Gemini CLI";t=hub.SendAsync(p,"fixture argument \"quoted\" trailing\\ & | >\nবাংলা");Check(t.Wait(10000)&&hub.Get(p.Id).Status=="Done","Gemini prompt survives native argument quoting");p.Provider="Codex CLI";

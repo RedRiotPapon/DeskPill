@@ -2583,7 +2583,7 @@ namespace DeskPill
         void HideInlineHost()
         {
             PreserveAgentDraft();
-            agentPrompt=null;agentResult=null;agentSend=null;agentVoice=null;agentStop=null;agentPicker=null;agentWave=null;agentDetailStatus=null;
+            agentPrompt=null;agentResult=null;agentSend=null;agentVoice=null;agentStop=null;agentPicker=null;agentWave=null;agentDetailStatus=null;agentDetails=null;
             inlineAskInput = null;
             inlineAskOutput = null;
             inlineTranslateLang = null;

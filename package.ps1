@@ -1,7 +1,7 @@
 ﻿param([switch]$SkipBuild)
 $ErrorActionPreference = 'Stop'
 if (!$SkipBuild) { & (Join-Path $PSScriptRoot 'build.ps1') }
-$releaseDirectory = Join-Path $PSScriptRoot 'dist/DeskPill-2.0.1'
+$releaseDirectory = Join-Path $PSScriptRoot 'dist/DeskPill-2.0.2'
 New-Item -ItemType Directory -Force -Path $releaseDirectory | Out-Null
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'bin/DeskPill.exe') -Destination $releaseDirectory -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'bin/DeskPill.Speech.exe') -Destination $releaseDirectory -Force
@@ -11,7 +11,7 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'LICENSE') -Destination $release
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'docs/AGENTS.md') -Destination $releaseDirectory -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'docs/CAPABILITIES.md') -Destination (Join-Path $releaseDirectory 'CAPABILITIES.md') -Force
 @'
-DeskPill 2.0.1
+DeskPill 2.0.2
 
 Run DeskPill.exe. Hover over the top-center notch to expand it.
 Use dots/arrows or the mouse wheel to switch pages.
@@ -41,6 +41,6 @@ Startup registration is opt-in through Settings.
 Windows 10/11 and .NET Framework 4.8 are required. No installation is needed.
 See README.md and CAPABILITIES.md for usage and current limitations.
 '@ | Set-Content -LiteralPath (Join-Path $releaseDirectory 'START-HERE.txt') -Encoding UTF8
-$archive = Join-Path $PSScriptRoot 'dist/DeskPill-2.0.1-portable.zip'
+$archive = Join-Path $PSScriptRoot 'dist/DeskPill-2.0.2-portable.zip'
 Compress-Archive -Path (Join-Path $releaseDirectory '*') -DestinationPath $archive -Force
 Write-Host ('Packaged ' + $archive)

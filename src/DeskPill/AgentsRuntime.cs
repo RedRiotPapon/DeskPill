@@ -18,11 +18,13 @@ namespace DeskPill
         internal readonly object Gate = new object();
         internal string status = "Ready", summary = "Ready to send a prompt.", output = "", sessionId = "";
         internal bool running;
-        internal string identity = "";
+        internal string identity = "", diagnostics = "";
         public string Draft = "";
         public string Status { get { lock(Gate) return status; } }
         public string Summary { get { lock(Gate) return summary; } }
         public string Output { get { lock(Gate) return output; } }
+        public string Diagnostics { get { lock(Gate) return diagnostics; } }
+        internal void Diagnostic(string value) { diagnostics=Tail(diagnostics+value,16384); }
         public string SessionId { get { lock(Gate) return sessionId; } }
         public bool Running { get { lock(Gate) return running; } }
         internal void Append(string value) { if(string.IsNullOrEmpty(value))return; output = Tail(output + value,16384); }
@@ -127,7 +129,7 @@ namespace DeskPill
         public event Action Changed;
         sealed class Run { internal bool Cancelled;internal OwnedAgentProcess Process;internal Task Task; }
         public AgentSession Get(string id){lock(gate){AgentSession s;if(!sessions.TryGetValue(id??"",out s)){s=new AgentSession();sessions.Add(id??"",s);}return s;}}
-        public bool Reset(string id){lock(gate){if(disposed||runs.ContainsKey(id))return false;var session=Get(id);lock(session.Gate){session.sessionId="";session.output="";session.status="Ready";session.summary="Ready to send a prompt.";}return true;}}
+        public bool Reset(string id){lock(gate){if(disposed||runs.ContainsKey(id))return false;var session=Get(id);lock(session.Gate){session.sessionId="";session.output="";session.diagnostics="";session.status="Ready";session.summary="Ready to send a prompt.";}return true;}}
         void Notify(){var handler=Changed;if(handler!=null)try{handler();}catch(ObjectDisposedException){}catch(InvalidOperationException){}}
         public Task SendAsync(AgentProfile profile,string prompt)
         {
@@ -144,7 +146,7 @@ namespace DeskPill
                 if(error.Length>0){lock(s.Gate)s.Attention(error);result=Task.FromResult(0);}
                 else{
                     var run=new Run();runs.Add(copy.Id,run);
-                    lock(s.Gate){string identity=copy.Provider+"\n"+copy.Executable+"\n"+copy.Workspace+"\n"+copy.AllowEdits;if(s.identity!=identity)s.sessionId="";s.identity=identity;s.running=true;s.status="Working";s.summary="Waiting for the tool's response…";s.output="";}
+                    lock(s.Gate){string identity=copy.Provider+"\n"+copy.Executable+"\n"+copy.Workspace+"\n"+copy.AllowEdits;if(s.identity!=identity)s.sessionId="";s.identity=identity;s.running=true;s.status="Working";s.summary="Waiting for the tool's response…";s.output="";s.diagnostics="";}
                     run.Task=Task.Run(()=>Execute(copy,prompt,s,run));result=run.Task;
                 }
             }
@@ -175,12 +177,12 @@ namespace DeskPill
                 while((n=reader.Read(buffer,0,buffer.Length))>0){
                     for(int i=0;i<n;i++){
                         char c=buffer[i];if(c=='\n'){
-                            if(!overflow){string value=line.ToString().TrimEnd('\r');if(error){lock(s.Gate)s.Append(value+Environment.NewLine);}else AgentTools.ApplyEvent(s,provider,value);Notify();}
+                            if(!overflow){string value=line.ToString().TrimEnd('\r');if(error){lock(s.Gate)s.Diagnostic(value+Environment.NewLine);}else AgentTools.ApplyEvent(s,provider,value);Notify();}
                             line.Length=0;overflow=false;
                         }else if(!overflow){if(line.Length<65536)line.Append(c);else{overflow=true;line.Length=0;}}
                     }
                 }
-                if(!overflow&&line.Length>0){if(error){lock(s.Gate)s.Append(line.ToString());}else AgentTools.ApplyEvent(s,provider,line.ToString());Notify();}
+                if(!overflow&&line.Length>0){if(error){lock(s.Gate)s.Diagnostic(line.ToString());}else AgentTools.ApplyEvent(s,provider,line.ToString());Notify();}
             }catch(IOException){}catch(ObjectDisposedException){}
         }
         public Task StopAsync(string id){lock(gate){Run r;if(!runs.TryGetValue(id??"",out r))return Task.FromResult(0);r.Cancelled=true;if(r.Process!=null)r.Process.Stop();return r.Task??Task.FromResult(0);}}

@@ -14,6 +14,9 @@ class AgentFixture {
  Console.WriteLine("{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"childpid="+p.Id+"\"}}");
  if(prompt=="tree")Thread.Sleep(60000);return 0;
  }
+ if(prompt=="diagnostic-flood")for(int n=0;n<100;n++)Console.Error.WriteLine(new string('d',1000));
+ if(prompt=="unterminated-diagnostic")Console.Error.Write("Tool diagnostic without newline");
+ if(prompt=="mcp-warning")Console.Error.WriteLine("ERROR rmcp::transport::worker: AuthRequired invalid_token for optional connector");
  if(prompt=="fail"){Console.Error.WriteLine("Fixture authentication failed");return 2;}
  if(prompt=="flood"){Console.Write(new string('x',2000000));Console.WriteLine();Console.Error.WriteLine(new string('e',2000000));}
  Console.WriteLine("{\"type\":\"thread.started\",\"thread_id\":\"12345678-1234-1234-1234-123456789abc\"}");

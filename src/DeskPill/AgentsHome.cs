@@ -17,12 +17,12 @@ namespace DeskPill
         AgentHub agentHub;
         System.Windows.Shapes.Ellipse agentIndicator;
         TextBlock agentPageStatus,agentPageSummary,agentDetailStatus;
-        Button agentPageAction,agentSend,agentVoice,agentStop;
+        Button agentPageAction,agentSend,agentVoice,agentStop,agentDetails;
         TextBox agentPrompt,agentResult;
         ComboBox agentPicker,agentHomePicker;
         string agentDetailId="";
         int agentRefreshQueued;
-        bool agentVoiceHeld;
+        bool agentVoiceHeld,agentDiagnosticsShown;
         AgentConnectionWindow agentEditor;
         DictationRecorder agentRecording;
         CancellationTokenSource agentSpeech;
@@ -93,6 +93,12 @@ namespace DeskPill
             var active=Agents.Get(detail.Id);
             agentDetailStatus.Text=(AgentTools.IsShortcut(detail)?"Manual handoff":active.Status)+" · "+(detail.AllowEdits?"Project edits allowed":"Review only")+" · "+ProjectName(detail.Workspace);
             string output=active.Status=="Needs attention"?active.Summary+Environment.NewLine+active.Output:string.IsNullOrEmpty(active.Output)?(AgentTools.IsShortcut(detail)?"Write a prompt below. Copy it, then open your app to choose its destination.":"Ask about this project. Responses appear here; voice fills your draft for review."):active.Output;
+            if(active.Diagnostics.Length==0)agentDiagnosticsShown=false;
+            agentDetails.Visibility=active.Diagnostics.Length>0?Visibility.Visible:Visibility.Hidden;
+            agentDetails.ToolTip=agentDiagnosticsShown?"Show agent response":"Show tool diagnostics";
+            System.Windows.Automation.AutomationProperties.SetName(agentDetails,Convert.ToString(agentDetails.ToolTip));
+            ((TextBlock)agentDetails.Content).Foreground=agentDiagnosticsShown?Ui.Green:Ui.Muted;
+            if(agentDiagnosticsShown)output="Tool diagnostics · separate from the agent reply"+Environment.NewLine+Environment.NewLine+active.Diagnostics;
             if(agentResult.Text!=output){bool atEnd=agentResult.VerticalOffset>=agentResult.ExtentHeight-agentResult.ViewportHeight-8;agentResult.Text=output;if(atEnd)agentResult.ScrollToEnd();}
             agentSend.IsEnabled=!active.Running&&agentSpeech==null&&!string.IsNullOrWhiteSpace(agentPrompt.Text);
             agentStop.IsEnabled=active.Running;
@@ -122,7 +128,7 @@ namespace DeskPill
             var profile=state.Agents.FirstOrDefault(a=>a.Id==id);if(profile==null)return;
             PreserveAgentDraft();CloseVolumeMenu();
             if(dictation!=null&&dictation.Active)dictation.Cancel();
-            agentDetailId=id;state.SelectedAgent=id;Save();
+            agentDiagnosticsShown=false;agentDetailId=id;state.SelectedAgent=id;Save();
             var body=new Grid();body.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(54)});body.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});
             var top=new DockPanel();var back=Ui.Button("←",ExitInlineView);back.ToolTip="Back to Agents";back.Padding=new Thickness(7,2,7,2);back.MinHeight=24;DockPanel.SetDock(back,Dock.Left);top.Children.Add(back);
             agentPicker=AgentControls.Picker();agentPicker.ItemsSource=state.Agents.ToArray();agentPicker.SelectedItem=profile;agentPicker.Height=26;agentPicker.Margin=new Thickness(5,0,5,0);agentPicker.MaxWidth=230;System.Windows.Automation.AutomationProperties.SetName(agentPicker,"Prompt destination");
@@ -141,6 +147,7 @@ namespace DeskPill
             agentVoice.PreviewKeyUp+=delegate(object sender,KeyEventArgs e){if(e.Key==Key.Space){agentVoiceHeld=false;FinishAgentVoice();e.Handled=true;}};
             agentVoice.LostMouseCapture+=delegate{agentVoiceHeld=false;FinishAgentVoice();};
             agentVoice.LostKeyboardFocus+=delegate{if(agentVoiceHeld){agentVoiceHeld=false;FinishAgentVoice();}};
+            agentDetails=Ui.IconButton("\uE946","Show tool diagnostics",delegate{agentDiagnosticsShown=!agentDiagnosticsShown;RefreshAgentViews();});agentDetails.Width=26;agentDetails.Height=26;DockPanel.SetDock(agentDetails,Dock.Left);footer.Children.Add(agentDetails);
             agentWave=new DictationWaveform{Width=100,Height=26,LayoutTransform=new ScaleTransform(.7,.7),Visibility=Visibility.Collapsed};DockPanel.SetDock(agentWave,Dock.Left);footer.Children.Add(agentWave);
             agentDetailStatus=Ui.Text("",10,Ui.Muted);agentDetailStatus.TextTrimming=TextTrimming.CharacterEllipsis;footer.Children.Add(agentDetailStatus);
             Grid.SetRow(footer,3);body.Children.Add(footer);
