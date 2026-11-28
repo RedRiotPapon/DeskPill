@@ -31,6 +31,7 @@ namespace DeskPill
         readonly StackPanel content = new StackPanel();
         readonly List<Button> navigation = new List<Button>();
         bool startupTouched, clearKey;
+        CheckBox startupChoice;
         System.Threading.CancellationTokenSource speechInstall;
         PasswordBox apiKey;
         TextBlock keyStatus;
@@ -189,6 +190,7 @@ namespace DeskPill
             });
             if (field == "StartWithWindows")
             {
+                startupChoice=c;
                 c.Checked += delegate
                 {
                     startupTouched = true;
@@ -653,6 +655,12 @@ namespace DeskPill
             pageList.Items.RemoveAt(i);
             pageList.Items.Insert(j, item);
             pageList.SelectedIndex = j;
+        }
+
+        internal void OpenStartupOptions()
+        {
+            OpenSection("General");
+            Dispatcher.BeginInvoke(new Action(delegate{if(startupChoice!=null){startupChoice.BringIntoView();startupChoice.Focus();}}));
         }
 
         internal void OpenSection(string name){var item=navigation.FirstOrDefault(b=>Convert.ToString(b.Content)==name);if(item!=null)item.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));}

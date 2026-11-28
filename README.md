@@ -21,7 +21,7 @@ DeskPill is a small desktop notch that expands when you need it. Control your mu
 
 Hover intent defaults to 110 ms before opening and 130 ms before revealing options, helping brief pointer passes stay quiet. Click actions respond immediately. Buttons show a focus outline for keyboard navigation without retaining it after mouse clicks. **Settings → Motion** lets you tune those delays, closing grace and animation pace with live preview and reset.
 
-The notch yields to occupied title-bar space, supports fullscreen hiding, and respects Windows reduced-motion settings. Startup is opt-in.
+The notch yields to occupied title-bar space, supports fullscreen hiding, and respects Windows reduced-motion settings. Startup is opt-in. Right-click the tray icon → **Start with Windows…**, check **Start DeskPill when I sign in**, then **Save**. Uncheck and save to disable it.
 
 ## Run it
 
@@ -108,7 +108,7 @@ You need Windows, .NET Framework 4.8 and Windows SDK metadata (`Windows.winmd`).
 ```powershell
 .\build.ps1            # Compile to bin/DeskPill.exe
 .\build.ps1 -Test      # Build and run all test suites
-.\package.ps1          # Create dist/DeskPill-2.1.3-portable.zip
+.\package.ps1          # Create dist/DeskPill-2.1.4-portable.zip
 ```
 
 The solution is also available as `DeskPill.sln`. Full UI, media and OCR probes require an interactive Windows desktop; CI runs the deterministic suites. See [CONTRIBUTING.md](CONTRIBUTING.md).

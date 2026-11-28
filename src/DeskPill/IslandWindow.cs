@@ -594,6 +594,10 @@ namespace DeskPill
             {
                 Dispatcher.BeginInvoke(new Action(ShowSettings));
             });
+            menu.Items.Add("Start with Windows…", null, delegate
+            {
+                Dispatcher.BeginInvoke(new Action(delegate{ShowSettings();if(settingsWindow!=null)settingsWindow.OpenStartupOptions();}));
+            });
             menu.Items.Add("Ask DeskPill", null, delegate
             {
                 Dispatcher.BeginInvoke(new Action(ShowInlineAsk));
