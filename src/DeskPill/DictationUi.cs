@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -364,6 +364,7 @@ namespace DeskPill
         CancellationTokenSource session;
         PasteTarget target;
         DateTime started;
+        string speechModel="Vosk",speechBackend="Auto";
         bool listening, disposed, reviewing, finishPending;
         public bool Active
         {
@@ -402,7 +403,7 @@ namespace DeskPill
             Cancel();
             if (!settings.DictationEnabled || disposed)
                 return;
-            if (!SpeechAssets.Ready)
+            if (!SpeechModels.IsReady(settings.SpeechModel))
             {
                 notify("Install English dictation in Settings first.");
                 return;
@@ -445,12 +446,13 @@ namespace DeskPill
                 return;
             if (Active)
                 return;
-            if (!settings.DictationEnabled || !SpeechAssets.Ready)
+            if (!settings.DictationEnabled || !SpeechModels.IsReady(settings.SpeechModel))
             {
                 notify("Enable English dictation in Settings first.");
                 return;
             }
 
+            speechModel=SpeechModels.Normalize(settings.SpeechModel);speechBackend=SpeechModels.NormalizeBackend(settings.SpeechBackend);
             target = PasteTarget.Capture();
             var token = new CancellationTokenSource();
             session = token;
@@ -487,6 +489,7 @@ namespace DeskPill
 
         public async void Finish()
         {
+            string selectedModel=speechModel,selectedBackend=speechBackend;
             if (!listening || recorder == null)
             {
                 if (Active && !reviewing)
@@ -515,7 +518,7 @@ namespace DeskPill
                 });
                 if (token.IsCancellationRequested)
                     return;
-                string text = await SpeechTranscriber.TranscribeAsync(wav, token.Token);
+                string text = await SpeechTranscriber.TranscribeAsync(wav, token.Token,selectedModel,selectedBackend);
                 if (token.IsCancellationRequested)
                     return;
                 if (string.IsNullOrWhiteSpace(text))

@@ -37,6 +37,7 @@ class SpeechWorker
 
     static int Main(string[] args)
     {
+        if((args.Length==3||args.Length==4)&&args[0]=="--parakeet")return ParakeetWorker.Run(args[1],args[2],args.Length==4?args[3]:"CPU");
         IntPtr model = IntPtr.Zero, recognizer = IntPtr.Zero;
         try
         {

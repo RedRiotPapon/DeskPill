@@ -1,4 +1,4 @@
-# DeskPill guide
+﻿# DeskPill guide
 
 [← Back to DeskPill](../README.md)
 
@@ -58,11 +58,11 @@ The speaker button opens a continuous system-volume slider. Click along its trac
 
 ## Optional English dictation
 
-Open **Settings → Dictation**, install the speech pack (about 54 MB), enable dictation and save. The tray menu also has a checked **Enable dictation · Win+Space** option; **Start / stop dictation** is available once enabled. Installing the speech pack alone does not enable the shortcut. Hold **Win+Space** while speaking, then release to transcribe and insert your words. **Esc** discards the recording. The notch itself shows the duration, an animated microphone and a waveform driven by actual microphone input; no listening window opens. If you switch apps, review stays inside the notch. The limit is 90 seconds.
+Open **Settings → Dictation**, choose and download Vosk (about 54 MB) or Parakeet (about 749 MB), enable dictation and save. The tray menu also has a checked **Enable dictation · Win+Space** option; **Start / stop dictation** is available once enabled. Installing the speech pack alone does not enable the shortcut. Hold **Win+Space** while speaking, then release to transcribe and insert your words. **Esc** discards the recording. The notch itself shows the duration, an animated microphone and a waveform driven by actual microphone input; no listening window opens. If you switch apps, review stays inside the notch. The limit is 90 seconds.
 
 While enabled, DeskPill takes over Win+Space, which Windows normally uses to switch input languages. Disabling dictation restores that shortcut. This is optional and off by default. No microphone capture runs while idle, and the speech model loads only for transcription in `DeskPill.Speech.exe`; that worker exits afterward to free its memory. Keep both executables together when extracting the portable ZIP.
 
-Recognition runs locally using Vosk and a small English model. The first setup needs internet access; speech audio does not leave your PC and is not written to a recording file. If you switch apps before transcription finishes, DeskPill offers review instead of unexpectedly pasting into another app. Names, accents and punctuation can need correction. See [speech components and licenses](../THIRD_PARTY_NOTICES.md).
+Recognition runs locally using your selected model. Vosk is the lightweight default; Parakeet offers Auto, CPU or Vulkan GPU processing. Read the [model requirements](DICTATION.md) before downloading. The first setup needs internet access; speech audio does not leave your PC and is not written to a recording file. If you switch apps before transcription finishes, DeskPill offers review instead of unexpectedly pasting into another app. Names, accents and punctuation can need correction. See [speech components and licenses](../THIRD_PARTY_NOTICES.md).
 
 ## Make it yours
 
@@ -87,7 +87,7 @@ You need Windows, .NET Framework 4.8 and Windows SDK metadata (`Windows.winmd`).
 ```powershell
 .\build.ps1            # Compile to bin/DeskPill.exe
 .\build.ps1 -Test      # Build and run all test suites
-.\package.ps1          # Create dist/DeskPill-2.1.4-portable.zip
+.\package.ps1          # Create dist/DeskPill-2.2.0-portable.zip
 ```
 
 The solution is also available as `DeskPill.sln`. Full UI, media and OCR probes require an interactive Windows desktop; CI runs the deterministic suites. See [CONTRIBUTING.md](../CONTRIBUTING.md).

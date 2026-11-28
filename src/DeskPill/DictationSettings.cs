@@ -6,7 +6,7 @@ namespace DeskPill
         // Explicit opt-in enables the shortcut only; it never opens the microphone.
         bool SetDictationEnabled(bool enabled)
         {
-            if(enabled&&!SpeechAssets.Ready){ShowSettings();if(settingsWindow!=null)settingsWindow.OpenSection("Dictation");return false;}
+            if(enabled&&!SpeechModels.IsReady(state.Settings.SpeechModel)){ShowSettings();if(settingsWindow!=null)settingsWindow.OpenSection("Dictation");return false;}
             bool previous=state.Settings.DictationEnabled;
             state.Settings.DictationEnabled=enabled;
             if(!Save()){state.Settings.DictationEnabled=previous;return false;}

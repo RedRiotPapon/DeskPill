@@ -33,6 +33,7 @@ namespace DeskPill
         }
         public static string ColorOrDefault(string value, string fallback) { return IsHexColor(value) ? value.ToUpperInvariant() : fallback; }
         public string Monitor = "", Style = "Classic", OpenMode = "Hover", StatusRing = "Water";
+        public string SpeechModel="Vosk", SpeechBackend="Auto";
         public bool AgentVoiceToggle = false;
         public bool AgentCompletionPeeks = true;
         public bool MirrorNotifications = true; public bool DictationEnabled = false;
@@ -131,6 +132,8 @@ namespace DeskPill
                 s.ShowHudPopups = true;
             }
             if (Version < 3) s.MirrorNotifications = true;
+            s.SpeechModel=s.SpeechModel=="Parakeet"?"Parakeet":"Vosk";
+            if(s.SpeechBackend!="CPU"&&s.SpeechBackend!="GPU")s.SpeechBackend="Auto";
             s.Theme = Settings.NormalizeTheme(s.Theme);
             if (string.IsNullOrEmpty(s.CustomShell)) s.CustomOutline = 18;
             s.CustomShell = Settings.ColorOrDefault(s.CustomShell, "#0C111B");

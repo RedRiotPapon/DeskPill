@@ -1,4 +1,4 @@
-param([switch]$Test)
+﻿param([switch]$Test)
 $ErrorActionPreference = 'Stop'
 $projectRoot = $PSScriptRoot
 $frameworkRoot = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319'
@@ -17,7 +17,7 @@ $arguments += '/win32icon:' + (Join-Path $projectRoot 'assets/DeskPill.ico')
 $arguments += @(Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src/DeskPill') -Filter '*.cs' | ForEach-Object FullName)
 & $compiler @arguments
 if ($LASTEXITCODE -ne 0) { throw 'DeskPill compilation failed.' }
-& $compiler /nologo /target:exe /platform:x64 /optimize+ /langversion:5 /r:System.Web.Extensions.dll ('/out:' + (Join-Path $outputDirectory 'DeskPill.Speech.exe')) (Join-Path $projectRoot 'tools/SpeechWorker.cs')
+& $compiler /nologo /target:exe /platform:x64 /optimize+ /langversion:5 /r:System.Web.Extensions.dll ('/out:' + (Join-Path $outputDirectory 'DeskPill.Speech.exe')) (Join-Path $projectRoot 'tools/SpeechWorker.cs') (Join-Path $projectRoot 'tools/ParakeetWorker.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Speech worker compilation failed.' }
 Write-Host ('Built ' + (Join-Path $outputDirectory 'DeskPill.exe'))
 if ($Test) { & (Join-Path $projectRoot 'tests/run.ps1') }

@@ -614,7 +614,7 @@ namespace DeskPill
             dictationEnabledItem.Click+=delegate{Dispatcher.BeginInvoke(new Action(delegate{SetDictationEnabled(!state.Settings.DictationEnabled);}));};
             var dictateNowItem=new Forms.ToolStripMenuItem("Start / stop dictation");
             dictateNowItem.Click+=delegate{Dispatcher.BeginInvoke(new Action(delegate{if(dictation!=null)dictation.Toggle();}));};
-            menu.Opening+=delegate{dictationEnabledItem.Checked=state.Settings.DictationEnabled;dictateNowItem.Enabled=state.Settings.DictationEnabled&&SpeechAssets.Ready;};
+            menu.Opening+=delegate{dictationEnabledItem.Checked=state.Settings.DictationEnabled;dictateNowItem.Enabled=state.Settings.DictationEnabled&&SpeechModels.IsReady(state.Settings.SpeechModel);};
             menu.Items.Add(dictationEnabledItem);menu.Items.Add(dictateNowItem);
             menu.Items.Add("Clipboard palette", null, delegate { Dispatcher.BeginInvoke(new Action(ShowClipboardPalette)); });
             menu.Items.Add("Recent notifications", null, delegate { Dispatcher.BeginInvoke(new Action(ShowRecentNotifications)); });

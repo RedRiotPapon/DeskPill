@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using DeskPill;
 
@@ -26,6 +26,13 @@ class DictationTests
         }
     }
 
+    static void TarFixture(string path,string name,byte kind,int declared,byte[] body)
+    {
+        byte[] header=new byte[512];var nameBytes=System.Text.Encoding.ASCII.GetBytes(name);Buffer.BlockCopy(nameBytes,0,header,0,nameBytes.Length);var size=System.Text.Encoding.ASCII.GetBytes(Convert.ToString(declared,8).PadLeft(11,'0')+"\0");Buffer.BlockCopy(size,0,header,124,size.Length);header[156]=kind;
+        using(var file=File.Create(path))using(var zip=new System.IO.Compression.GZipStream(file,System.IO.Compression.CompressionMode.Compress)){zip.Write(header,0,512);zip.Write(body,0,body.Length);if(body.Length==declared){var end=new byte[(512-body.Length%512)%512+1024];zip.Write(end,0,end.Length);}}
+    }
+    static bool RejectArchive(string archive,string directory){try{ParakeetAssets.ExtractRuntime(archive,directory,System.Threading.CancellationToken.None);return false;}catch(InvalidDataException){return true;}}
+
     static int Main()
     {
         try
@@ -44,6 +51,21 @@ class DictationTests
             Check(agentStops == 1 && normalStops == 0, "Release and cancellation route only to active agent voice");
             endRoute.Invoke(null, new object[] { false, new Action(() => agentStops++), new Action(() => normalStops++) });
             Check(agentStops == 1 && normalStops == 1, "Ordinary dictation retains its release and cancellation path");
+            Check(SpeechModels.NormalizeBackend("bad")=="Auto"&&SpeechModels.NormalizeBackend("GPU")=="GPU","Device choices preserve explicit GPU and repair invalid values");
+            Check(new Settings().SpeechModel=="Vosk"&&SpeechModels.Normalize("unknown")=="Vosk","Lightweight speech remains default and repairs unknown selections");
+            Check(SpeechModels.Name("Parakeet")=="Parakeet Unified English"&&SpeechModels.IsReady("Vosk")==SpeechAssets.Ready,"Model catalog routes readiness independently");
+            using(var cancelPack=new System.Threading.CancellationTokenSource()){
+                cancelPack.Cancel();bool cancelledPack=false;try{ParakeetAssets.InstallAsync(delegate{},cancelPack.Token).GetAwaiter().GetResult();}catch(OperationCanceledException){cancelledPack=true;}Check(cancelledPack,"Cancelled Parakeet installation starts no download");
+            }
+            string packs=Path.Combine(Path.GetTempPath(),"DeskPill-SpeechPacks-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(packs);
+            try{
+                string archive=Path.Combine(packs,"runtime.tar.gz"),destination=Path.Combine(packs,"valid");
+                TarFixture(archive,"runtime/probe.txt",(byte)'0',4,new byte[]{1,2,3,4});ParakeetAssets.ExtractRuntime(archive,destination,System.Threading.CancellationToken.None);Check(File.ReadAllBytes(Path.Combine(destination,"runtime","probe.txt")).Length==4,"Parakeet runtime extracts bounded regular files");
+                TarFixture(archive,"../escape",(byte)'0',0,new byte[0]);Check(RejectArchive(archive,Path.Combine(packs,"unsafe")),"Parakeet archive rejects traversal");
+                TarFixture(archive,"link",(byte)'2',0,new byte[0]);Check(RejectArchive(archive,Path.Combine(packs,"link")),"Parakeet archive rejects links");
+                TarFixture(archive,"huge",(byte)'0',80000001,new byte[0]);Check(RejectArchive(archive,Path.Combine(packs,"large")),"Parakeet archive rejects oversized expansion");
+                TarFixture(archive,"short",(byte)'0',10,new byte[]{1});Check(RejectArchive(archive,Path.Combine(packs,"short")),"Parakeet archive rejects truncated data");
+            }finally{string resolved=Path.GetFullPath(packs),temp=Path.GetFullPath(Path.GetTempPath()).TrimEnd(Path.DirectorySeparatorChar)+Path.DirectorySeparatorChar;if(!resolved.StartsWith(temp,StringComparison.OrdinalIgnoreCase)||!Path.GetFileName(resolved).StartsWith("DeskPill-SpeechPacks-"))throw new IOException("Unexpected test cleanup path");Directory.Delete(resolved,true);}
             var data = new byte[]
             {
                 1,

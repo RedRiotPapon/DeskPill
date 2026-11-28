@@ -12,6 +12,7 @@ namespace DeskPill
     public sealed partial class IslandWindow
     {
         bool agentVoiceFinishPending, agentVoiceToggleSession;
+        string agentSpeechModel="Vosk",agentSpeechBackend="Auto";
 
         internal bool AgentVoiceActive { get { return agentSpeech != null; } }
 
@@ -43,7 +44,7 @@ namespace DeskPill
         {
             Action describe = delegate
             {
-                string help = !SpeechAssets.Ready ? "Set up optional on-device English speech" :
+                string help = !SpeechModels.IsReady(state.Settings.SpeechModel) ? "Set up optional on-device English speech" :
                     state.Settings.AgentVoiceToggle ? "Click to dictate; click again to review · Esc cancels · 90-second limit" :
                     "Hold mouse, Space or Enter to dictate; release to review · Esc cancels";
                 button.ToolTip = help + " · Right-click for voice mode";
@@ -114,7 +115,8 @@ namespace DeskPill
                 id != agentDetailId || state.SelectedAgent != id || !state.Agents.Any(a => a.Id == id))
             { if (!AgentVoiceActive) ReleaseAgentVoiceHold(); return; }
             if (Agents.Get(id).Running) { ReleaseAgentVoiceHold(); return; }
-            if (!SpeechAssets.Ready) { ReleaseAgentVoiceHold(); ShowAgentSpeechSetup(); return; }
+            if (!SpeechModels.IsReady(state.Settings.SpeechModel)) { ReleaseAgentVoiceHold(); ShowAgentSpeechSetup(); return; }
+            agentSpeechModel=SpeechModels.Normalize(state.Settings.SpeechModel);agentSpeechBackend=SpeechModels.NormalizeBackend(state.Settings.SpeechBackend);
             agentSpeech = new CancellationTokenSource();
             var token = agentSpeech;
             agentVoiceTarget = id;
@@ -154,7 +156,7 @@ namespace DeskPill
             ReleaseAgentVoiceHold();
             if (agentRecording == null) return;
             var recorder = agentRecording; agentRecording = null;
-            var token = agentSpeech; string id = agentVoiceTarget; int revision = agentVoiceRevision;
+            var token = agentSpeech; string id = agentVoiceTarget; int revision = agentVoiceRevision; string speechModel=agentSpeechModel,speechBackend=agentSpeechBackend;
             agentVoiceTimer.Stop();
             if (agentWave != null) { agentWave.Processing = true; agentWave.Level = 0; }
             if (agentDetailStatus != null) agentDetailStatus.Text = "Turning speech into a draft…";
@@ -162,7 +164,7 @@ namespace DeskPill
             {
                 byte[] wave = await Task.Run(delegate { try { return recorder.Finish(); } finally { recorder.Dispose(); } });
                 token.Token.ThrowIfCancellationRequested();
-                string text = await SpeechTranscriber.TranscribeAsync(wave, token.Token);
+                string text = await SpeechTranscriber.TranscribeAsync(wave, token.Token,speechModel,speechBackend);
                 if (token.IsCancellationRequested || stopping || revision != agentVoiceRevision ||
                     pose != NotchPose.InlineAgents || agentDetailId != id || state.SelectedAgent != id || agentPrompt == null)
                 { if (!token.IsCancellationRequested && revision == agentVoiceRevision) CancelAgentVoice(); return; }

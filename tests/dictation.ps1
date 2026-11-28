@@ -1,4 +1,4 @@
-$ErrorActionPreference='Stop'
+﻿$ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $framework=Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319'
 $runDirectory=Join-Path $env:TEMP ('DeskPill-DictationTests-'+[Guid]::NewGuid().ToString('N'))
@@ -6,7 +6,7 @@ New-Item -ItemType Directory -Path $runDirectory | Out-Null
 try {
  Copy-Item -LiteralPath (Join-Path $root 'bin/DeskPill.exe') -Destination $runDirectory
  $output=Join-Path $runDirectory 'DictationTests.exe'
- $arguments=@('/nologo','/target:exe','/langversion:5',('/out:'+$output),('/r:'+(Join-Path $runDirectory 'DeskPill.exe')),'/r:System.dll','/r:System.Core.dll','/r:System.Xaml.dll')
+ $arguments=@('/nologo','/target:exe','/langversion:5',('/out:'+$output),('/r:'+(Join-Path $runDirectory 'DeskPill.exe')),'/r:System.dll','/r:System.Core.dll','/r:System.IO.Compression.dll','/r:System.Xaml.dll')
  foreach($assembly in @('WindowsBase','PresentationCore','PresentationFramework')) { $arguments+='/r:'+(Join-Path $framework ('WPF/'+$assembly+'.dll')) }
  $arguments+=Join-Path $PSScriptRoot 'DictationTests.cs'
  & (Join-Path $framework 'csc.exe') @arguments

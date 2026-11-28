@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -439,33 +439,38 @@ namespace DeskPill
                 // Replace only this exact app-owned, versioned asset directory after complete verification.
                 if (Path.GetDirectoryName(Path.GetFullPath(Root)) != Path.GetFullPath(parent))
                     throw new IOException("Unexpected speech asset directory.");
-                if (Directory.Exists(Root))
-                    Directory.Delete(Root, true);
-                Directory.Move(stage, Root);
+                string backup=Root+".old-"+Guid.NewGuid().ToString("N");bool replaced=false;
+                try{if(Directory.Exists(Root))Directory.Move(Root,backup);Directory.Move(stage,Root);replaced=true;}
+                finally{if(!replaced&&Directory.Exists(backup)&&!Directory.Exists(Root))Directory.Move(backup,Root);}
+                if(Directory.Exists(backup)&&Path.GetDirectoryName(Path.GetFullPath(backup))==Path.GetFullPath(parent))Directory.Delete(backup,true);
                 progress("English dictation is ready. Enable it and save to use Win+Space.");
             }
             finally
             {
-                if (Directory.Exists(stage) && Path.GetDirectoryName(Path.GetFullPath(stage)) == Path.GetFullPath(parent) && Path.GetFileName(stage).StartsWith("install-", StringComparison.Ordinal))
-                    Directory.Delete(stage, true);
-                installLock.Release();
+                try{
+                    if (Directory.Exists(stage) && Path.GetDirectoryName(Path.GetFullPath(stage)) == Path.GetFullPath(parent) && Path.GetFileName(stage).StartsWith("install-", StringComparison.Ordinal))Directory.Delete(stage, true);
+                }finally{installLock.Release();}
             }
         }
     }
 
     public static class SpeechTranscriber
     {
-        public static async Task<string> TranscribeAsync(byte[] wav, CancellationToken cancellation)
+        public static Task<string> TranscribeAsync(byte[] wav,CancellationToken cancellation){return TranscribeAsync(wav,cancellation,"Vosk");}
+        public static Task<string> TranscribeAsync(byte[] wav,CancellationToken cancellation,string speechModel){return TranscribeAsync(wav,cancellation,speechModel,"Auto");}
+        public static async Task<string> TranscribeAsync(byte[] wav, CancellationToken cancellation,string speechModel,string speechBackend)
         {
+            string backend=SpeechModels.NormalizeBackend(speechBackend);
+            bool parakeet=SpeechModels.Normalize(speechModel)=="Parakeet";
             cancellation.ThrowIfCancellationRequested();
-            if (!SpeechAssets.Ready)
-                throw new InvalidOperationException("Install the English speech pack in Settings > Dictation first.");
+            if (!SpeechModels.IsReady(speechModel))
+                throw new InvalidOperationException("Install "+SpeechModels.Name(speechModel)+" in Settings > Dictation first.");
             string executable = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "DeskPill.Speech.exe");
             if (!File.Exists(executable))
                 throw new InvalidOperationException("The speech worker is missing. Extract all files from the DeskPill portable ZIP.");
             using (var process = new Process
             {
-                StartInfo = new ProcessStartInfo(executable, "\"" + SpeechAssets.Runtime + "\" \"" + SpeechAssets.Model + "\"")
+                StartInfo = new ProcessStartInfo(executable,parakeet?"--parakeet \""+ParakeetAssets.Runtime+"\" \""+ParakeetAssets.Model+"\" "+backend:"\"" + SpeechAssets.Runtime + "\" \"" + SpeechAssets.Model + "\"")
                 {
                     UseShellExecute = false,
                     CreateNoWindow = true,
@@ -500,7 +505,7 @@ namespace DeskPill
                         await process.StandardInput.BaseStream.WriteAsync(wav, 0, wav.Length, cancellation);
                         process.StandardInput.Close();
                         var exit = Task.Run((Action)process.WaitForExit);
-                        if (await Task.WhenAny(exit, Task.Delay(TimeSpan.FromSeconds(120))) != exit)
+                        if (await Task.WhenAny(exit, Task.Delay(TimeSpan.FromSeconds(parakeet?600:120))) != exit)
                         {
                             process.Kill();
                             await exit;
@@ -510,9 +515,10 @@ namespace DeskPill
                         await exit;
                         cancellation.ThrowIfCancellationRequested();
                         string text = await output;
-                        await errors;
+                        string detail=await errors;
+                        if(process.ExitCode!=0&&parakeet&&backend=="Auto")return await TranscribeAsync(wav,cancellation,speechModel,"CPU");
                         if (process.ExitCode != 0)
-                            throw new InvalidOperationException("The speech engine could not finish. Try reinstalling the English speech pack.");
+                            throw new InvalidOperationException(parakeet?"Parakeet could not finish. "+(detail.Length<600?detail:"Check available memory or repair the speech pack."):"The speech engine could not finish. Try reinstalling the English speech pack.");
                         return text.Trim();
                     }
                     finally

@@ -580,21 +580,39 @@ namespace DeskPill
         StackPanel Dictation()
         {
             var p=Page("Dictation", "English speech to text, privately on your PC. Optional and off by default.");
-            Check(p,"Click to start and stop agent dictation (hold by default)","AgentVoiceToggle");
             Check(p,"Enable English dictation · Win+Space","DictationEnabled");
-            Note(p,"Hold Win+Space while speaking; release to insert. The microphone waveform appears inside the notch. Esc cancels. While enabled, this replaces Windows’ Win+Space language switch. Disabling restores it.");
-            Note(p,"Install the English speech pack once (about 54 MB download). Recognition runs on-device in a separate worker, which exits after each transcription to release its model memory. No microphone access while idle. Recordings are limited to 90 seconds.");
-            var status=Ui.Text(SpeechAssets.Ready?"English speech pack is ready.":"English speech pack is not installed.",12,Ui.Muted);status.TextWrapping=TextWrapping.Wrap;status.Margin=new Thickness(0,12,0,8);p.Children.Add(status);
-            Button install=null;install=Ui.Button("Install / repair English speech",async delegate
+            Note(p,"Select a model, download its pack if needed, then Save. Selecting alone never downloads anything.");
+            var installers=new List<Button>();var modelChoices=new List<RadioButton>();
+            var cancel=Ui.Button("Cancel download",delegate{if(speechInstall!=null)speechInstall.Cancel();});cancel.Visibility=Visibility.Collapsed;
+            foreach(string modelId in new[]{"Vosk","Parakeet"})
             {
-                install.IsEnabled=false;speechInstall=new System.Threading.CancellationTokenSource();
-                try{await SpeechAssets.InstallAsync(delegate(string message){Dispatcher.BeginInvoke(new Action(delegate{status.Text=message;}));},speechInstall.Token,true);}
-                catch(OperationCanceledException){status.Text="Installation cancelled.";}
-                catch(Exception e){status.Text=speechInstall.IsCancellationRequested?"Installation cancelled.":"Installation failed: "+e.Message;}
-                finally{install.IsEnabled=true;speechInstall.Dispose();speechInstall=null;}
-            });p.Children.Add(install);
+                string model=modelId;var card=new StackPanel{Margin=new Thickness(12,8,12,10)};
+                var choice=new RadioButton{GroupName="SpeechModel",Content=SpeechModels.Name(model)+(model=="Vosk"?" · Lightweight (default)":" · Larger model"),IsChecked=SpeechModels.Normalize(draft.SpeechModel)==model,FontSize=14,Foreground=Ui.White};
+                System.Windows.Automation.AutomationProperties.SetName(choice,SpeechModels.Name(model));
+                choice.Checked+=delegate{draft.SpeechModel=model;};modelChoices.Add(choice);card.Children.Add(choice);
+                Note(card,model=="Vosk"?"Download: about 54 MB including runtime. Model memory: about 300 MB. Recommended: 4 GB system RAM and 300 MB free disk. Windows x64; CPU only, no GPU needed. Small footprint; names, punctuation and accents can need correction.":"Download: 731 MB model + 18 MB runtime (about 749 MB total). Recommended: 8 GB system RAM and 2 GB free disk for installation/repair. Windows x64 (Intel/AMD). CPU works without a GPU; optional GPU acceleration uses Vulkan. Supports punctuation/capitalization. Longer recordings need more memory. Processing starts after release; no streaming yet.");
+                if(model=="Parakeet")Note(card,"May require Microsoft Visual C++ 2015–2022 Redistributable (x64). RAM figures are recommendations, not measured guarantees; performance depends on your PC and recording length.");
+                var status=Ui.Text(SpeechModels.IsReady(model)?"Installed · ready":"Not installed",11,Ui.Muted);status.TextWrapping=TextWrapping.Wrap;card.Children.Add(status);
+                var install=Ui.Button((SpeechModels.IsReady(model)?"Repair ":"Download ")+SpeechModels.Name(model),async delegate{
+                    if(speechInstall!=null)return;
+                    var installation=new System.Threading.CancellationTokenSource();speechInstall=installation;foreach(var button in installers)button.IsEnabled=false;cancel.Visibility=Visibility.Visible;
+                    try{await SpeechModels.InstallAsync(model,delegate(string message){Dispatcher.BeginInvoke(new Action(delegate{status.Text=message;}));},installation.Token);}
+                    catch(OperationCanceledException){status.Text="Download cancelled · existing pack kept";}
+                    catch(Exception e){status.Text=installation.IsCancellationRequested?"Download cancelled · existing pack kept":"Installation failed: "+e.Message;}
+                    finally{installation.Dispose();if(speechInstall==installation)speechInstall=null;foreach(var button in installers)button.IsEnabled=true;cancel.Visibility=Visibility.Collapsed;}
+                });install.Margin=new Thickness(0,8,0,0);installers.Add(install);card.Children.Add(install);p.Children.Add(Ui.Panel(card));
+            }
+            var devicePanel=new StackPanel();
+            Choice(devicePanel,"Parakeet processing device","SpeechBackend",new[]{"Auto","CPU","GPU"});
+            Note(devicePanel,"Auto: use a compatible GPU when available, otherwise CPU; retry on CPU if the GPU fails. CPU: no graphics requirement. GPU: Vulkan-capable NVIDIA/AMD/Intel graphics, a current driver and recommended 2 GB free graphics memory. This is a recommendation, not a hard minimum. Forced GPU reports incompatibility instead of silently switching. Vosk always uses CPU.");
+            devicePanel.Visibility=SpeechModels.Normalize(draft.SpeechModel)=="Parakeet"?Visibility.Visible:Visibility.Collapsed;
+            foreach(var radio in modelChoices)radio.Checked+=delegate{devicePanel.Visibility=SpeechModels.Normalize(draft.SpeechModel)=="Parakeet"?Visibility.Visible:Visibility.Collapsed;};
+            p.Children.Add(devicePanel);
+            p.Children.Add(cancel);
+            Note(p,"Hold Win+Space while speaking; release to insert. The microphone waveform appears inside the notch. Esc cancels. While enabled, this replaces Windows’ Win+Space language switch. Disabling restores it.");
+            Check(p,"Click to start and stop agent dictation (hold by default)","AgentVoiceToggle");
             Closed+=delegate{if(speechInstall!=null)speechInstall.Cancel();};
-            Note(p,"Speech recognition uses Vosk and its small US English model (Apache 2.0). It may miss names, accents and punctuation. Review is offered if you switch apps before the result is ready. No speech account or API key is needed.");
+            Note(p,"Models load after you finish speaking in a separate worker, which exits afterward to free memory. No microphone access while idle. Recordings are limited to 90 seconds; Esc cancels. Speech fills an agent draft for review and never sends it automatically.");
             return p;
         }
 
@@ -803,7 +821,7 @@ namespace DeskPill
             {
                 foreach (var read in readers)
                     read();
-                if (draft.DictationEnabled && !SpeechAssets.Ready) throw new InvalidOperationException("Install the English speech pack in Dictation before enabling it.");
+                if (draft.DictationEnabled && !SpeechModels.IsReady(draft.SpeechModel)) throw new InvalidOperationException("Download "+SpeechModels.Name(draft.SpeechModel)+" in Dictation before enabling it, or turn dictation off.");
                 if (!string.IsNullOrWhiteSpace(apiKey.Password))
                     draft.ProtectedApiKey = AskService.ProtectKey(apiKey.Password.Trim());
                 else if (clearKey)

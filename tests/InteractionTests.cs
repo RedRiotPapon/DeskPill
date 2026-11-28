@@ -285,6 +285,14 @@ class InteractionTests {
    state.Settings.StatusRing="None";Call(w,"UpdateValues");Check(ring.Visibility!=Visibility.Visible && ((Ring)Field(w,"expandedRing")).Visibility!=Visibility.Visible,"None still displays a ring");
    state.Settings.StatusRing="Focus";Call(w,"UpdateValues");Check(ring.Visibility==Visibility.Visible && ring.Progress>=0 && ring.Progress<=1,"Focus ring did not restore");Call(w,"Cleanup");
   });
+  Test("Speech model cards show requirements and model selection stays staged",delegate {
+   var w=Island();try{var state=(AppState)Field(w,"state");Call(w,"ShowSettings");var settings=(SettingsWindow)Field(w,"settingsWindow");Call(settings,"OpenSection","Dictation");
+    var choices=Controls<RadioButton>(settings).Where(c=>c.GroupName=="SpeechModel").ToArray();Check(choices.Length==2,"Missing speech model choices");var parakeet=choices.Single(c=>Convert.ToString(c.Content).Contains("Parakeet"));
+    Check(Controls<TextBlock>(settings).Any(t=>t.Text.Contains("731 MB"))&&Controls<TextBlock>(settings).Any(t=>t.Text.Contains("300 MB")),"Model requirements are missing");parakeet.IsChecked=true;var device=Controls<ComboBox>(settings).Single(c=>c.Items.Contains("Auto")&&c.Items.Contains("GPU"));device.SelectedItem="GPU";Check(state.Settings.SpeechBackend=="Auto","Device choice applied before Save");Check(state.Settings.SpeechModel=="Vosk"&&Field(settings,"speechInstall")==null,"Selection applied or downloaded without consent");settings.Close();Check(state.Settings.SpeechModel=="Vosk","Cancel changed the speech model");
+    Call(w,"ShowSettings");settings=(SettingsWindow)Field(w,"settingsWindow");Call(settings,"OpenSection","Dictation");Controls<RadioButton>(settings).Single(c=>c.GroupName=="SpeechModel"&&Convert.ToString(c.Content).Contains("Parakeet")).IsChecked=true;Controls<ComboBox>(settings).Single(c=>c.Items.Contains("Auto")&&c.Items.Contains("GPU")).SelectedItem="GPU";
+    Controls<Button>(settings).Single(b=>Convert.ToString(b.Content)=="Save changes").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Check(state.Settings.SpeechModel=="Parakeet"&&state.Settings.SpeechBackend=="GPU"&&!state.Settings.DictationEnabled,"Save lost model choice or enabled microphone");
+   }finally{Call(w,"Cleanup");}
+  });
   Test("Dictation preferences remain optional and staged until saved",delegate {
    var w=Island();var state=(AppState)Field(w,"state");Call(w,"ShowSettings");var settings=(SettingsWindow)Field(w,"settingsWindow");
    Controls<Button>(settings).Single(b=>Convert.ToString(b.Content)=="Dictation").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));

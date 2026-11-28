@@ -117,6 +117,10 @@ class DomainTests
                 File.WriteAllText(Path.Combine(dir,"state.json"),"{damaged");var recovered=new StateStore(dir).Load();
                 Check(recovered.Settings.Theme=="Custom"&&recovered.Agents.Count==a.Agents.Count-1,"Damaged primary recovers prior preferences and connections");
                 store.Save(a);
+                var backendField=typeof(Settings).GetField("SpeechBackend");Check(backendField!=null,"Dictation device choice exists");backendField.SetValue(a.Settings,"GPU");store.Save(a);Check((string)backendField.GetValue(store.Load().Settings)=="GPU","GPU choice survives restart");backendField.SetValue(a.Settings,"broken");a.Normalize(DateTime.Now);Check((string)backendField.GetValue(a.Settings)=="Auto","Unknown dictation device repairs to Automatic");
+                var speechField=typeof(Settings).GetField("SpeechModel");Check(speechField!=null,"Dictation model choice exists");
+                speechField.SetValue(a.Settings,"Parakeet");store.Save(a);Check((string)speechField.GetValue(store.Load().Settings)=="Parakeet","Parakeet selection survives restart");
+                speechField.SetValue(a.Settings,"unknown");a.Normalize(DateTime.Now);Check((string)speechField.GetValue(a.Settings)=="Vosk","Unknown speech model repairs to Vosk");
                 a.Settings.KeepClipboard = true;
                 store.Save(a);
                 Check(store.Load().Clipboard.Count == 1, "clipboard opt in persists");
