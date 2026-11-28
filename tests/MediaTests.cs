@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
@@ -20,6 +20,23 @@ class MediaTests
     {
         try
         {
+            var playbackOrdered=new PlaybackCommandQueue();var held=new TaskCompletionSource<bool?>();var started=new ManualResetEventSlim();bool secondRan=false;
+            var earlier=playbackOrdered.Enqueue(()=>{started.Set();return held.Task;});Check(started.Wait(1000),"First playback request enters the ordered queue");
+            var later=playbackOrdered.Enqueue(()=>{secondRan=true;return Task.FromResult<bool?>(true);});Check(!secondRan,"A later click cannot overtake a pending playback command");
+            held.SetResult(false);earlier.GetAwaiter().GetResult();later.GetAwaiter().GetResult();Check(secondRan,"The final playback intent runs after the preceding command");
+            var feedback=new MediaPlaybackFeedback();int first=feedback.Begin("player",true);
+            Check(!feedback.Effective("player",true),"Pause feedback is immediate before provider acknowledgement");
+            int second=feedback.Begin("player",true);Check(feedback.Effective("player",false),"Rapid play click uses the pending intent");
+            Check(!feedback.Resolve(first)&&feedback.Effective("player",false),"An old playback response cannot overwrite a newer click");
+            Check(feedback.Resolve(second)&&!feedback.Effective("player",false),"Refused playback restores the observed state");
+            feedback.Begin("player",true);Check(feedback.Effective("other",true),"Switching players discards old optimistic state");
+            var settings=new Settings();string registration="old command";int saves=0;
+            StartupRegistration.Change(settings,true,@"C:\Apps\DeskPill.exe",()=>registration,v=>registration=v,()=>saves++);
+            Check(settings.StartWithWindows&&registration=="\""+@"C:\Apps\DeskPill.exe"+"\""&&saves==1,"Direct startup enable writes a quoted executable and saves once");
+            StartupRegistration.Change(settings,false,"unused",()=>registration,v=>registration=v,()=>saves++);
+            Check(!settings.StartWithWindows&&registration==null&&saves==2,"Direct startup disable clears only the owned entry");
+            registration="old command";bool failed=false;try{StartupRegistration.Change(settings,true,"new.exe",()=>registration,v=>registration=v,()=>{throw new Exception("disk blocked");});}catch{failed=true;}
+            Check(failed&&!settings.StartWithWindows&&registration=="old command","Failed startup persistence rolls back registration and preference");
             var policy = typeof(MediaSnapshot).Assembly.GetType("DeskPill.MediaSourcePolicy");
             Check(policy != null, "Media source matching is available");
             Func<string, string> exe = s => (string)policy.GetMethod("Executable").Invoke(null, new object[] { s });

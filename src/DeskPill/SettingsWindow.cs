@@ -47,7 +47,7 @@ namespace DeskPill
             Themes.ConfigureCustom(draft);
             this.previewTheme = previewTheme ?? Themes.Apply;
             this.previewPreferences=previewPreferences??delegate{};
-            Closed += delegate { if (!themeCommitted) { Themes.ConfigureCustom(savedAppearance); this.previewTheme(savedTheme); this.previewPreferences(savedAppearance,false); } };
+            Closed += delegate { if (!themeCommitted) { Themes.ConfigureCustom(savedAppearance); this.previewTheme(savedTheme); this.previewPreferences(state.Settings,false); } };
             Title = "DeskPill Settings";
             Width = 820;
             Height = 620;
@@ -64,7 +64,7 @@ namespace DeskPill
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition());
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            var heading = Ui.Column(Ui.Text("DeskPill Settings", 25, Ui.White), Ui.Text("Make the island feel like yours.", 12, Ui.Muted));
+            var heading = Ui.Column(Ui.Text("DeskPill Settings", 25, Ui.White), Ui.Text("Visual changes preview live. Save keeps them.", 12, Ui.Muted));
             heading.Margin = new Thickness(0, 0, 0, 20);
             var header=new Grid();
             header.ColumnDefinitions.Add(new ColumnDefinition());
@@ -118,7 +118,7 @@ namespace DeskPill
             });
             DockPanel.SetDock(cancel, Dock.Right);
             footer.Children.Add(cancel);
-            footer.Children.Add(Ui.Text("Preview changes here. Save keeps them; Cancel restores them.", 11, Ui.Muted));
+            footer.Children.Add(Ui.Text("Live preview · Save keeps it. Cancel restores it.", 11, Ui.Muted));
             Content = root;
             navigation[0].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         }
@@ -198,6 +198,8 @@ namespace DeskPill
             {
                 f.SetValue(draft, c.IsChecked == true);
             });
+            c.Checked+=delegate{f.SetValue(draft,true);PreviewField(field);};
+            c.Unchecked+=delegate{f.SetValue(draft,false);PreviewField(field);};
             if (field == "StartWithWindows")
             {
                 startupChoice=c;
@@ -222,6 +224,7 @@ namespace DeskPill
             {
                 f.SetValue(draft, t.Text.Trim());
             });
+            t.TextChanged+=delegate{if(LivePreviewFields.Contains(field)){f.SetValue(draft,t.Text.Trim());PreviewField(field);}};
             return t;
         }
 
@@ -231,6 +234,13 @@ namespace DeskPill
             var f = typeof(Settings).GetField(field);
             var t = Ui.Input(Convert.ToString(f.GetValue(draft), CultureInfo.InvariantCulture));
             p.Children.Add(t);
+            System.Windows.Automation.AutomationProperties.SetName(t,label);
+            t.TextChanged+=delegate{
+                double value;
+                if(LivePreviewFields.Contains(field)&&double.TryParse(t.Text,NumberStyles.Float,CultureInfo.InvariantCulture,out value)&&!double.IsNaN(value)&&!double.IsInfinity(value)&&value>=min&&value<=max&&(f.FieldType!=typeof(int)||value==Math.Truncate(value))){
+                    f.SetValue(draft,f.FieldType==typeof(int)?(object)(int)value:(object)value);PreviewField(field);
+                }
+            };
             readers.Add(delegate
             {
                 double v;
@@ -261,6 +271,7 @@ namespace DeskPill
             {
                 f.SetValue(draft, (string)c.SelectedItem);
             });
+            c.SelectionChanged+=delegate{if(c.SelectedItem!=null){f.SetValue(draft,(string)c.SelectedItem);PreviewField(field);}};
         }
 
         StackPanel Appearance()
@@ -402,9 +413,9 @@ namespace DeskPill
 
         StackPanel General()
         {
-            var p = Page("General", "Appearance, placement and everyday behavior.");
+            var p = Page("General", "Preview placement, clock, status and hover behavior as you change them. Cancel restores your saved settings.");
             Check(p, "Start DeskPill when I sign in", "StartWithWindows");
-            Note(p, "Startup is opt-in. Saving a changed checkbox updates only DeskPill's current-user Windows Run entry.");
+            Note(p, "Startup is applied on Save. The tray menu’s Start with Windows toggle applies immediately.");
             var screens = System.Windows.Forms.Screen.AllScreens.Select(delegate (System.Windows.Forms.Screen s)
             {
                 return s.DeviceName;
@@ -654,6 +665,8 @@ namespace DeskPill
                 var choice=new CheckBox {Content=name,IsChecked=!(draft.HiddenPages??new string[0]).Contains(name)};
                 System.Windows.Automation.AutomationProperties.SetName(choice,"Show "+name+" page"); visible[name]=choice;p.Children.Add(choice);
             }
+            Action previewPages=delegate{if(visible.Values.Any(c=>c.IsChecked==true)){draft.HiddenPages=visible.Where(c=>c.Value.IsChecked!=true).Select(c=>c.Key).ToArray();this.previewPreferences(draft,false);}};
+            foreach(var check in visible.Values){check.Checked+=delegate{previewPages();};check.Unchecked+=delegate{previewPages();};}
             readers.Add(delegate {
                 if(!visible.Values.Any(c=>c.IsChecked==true))throw new ArgumentException("Keep at least one page visible.");
                 draft.HiddenPages=visible.Where(c=>c.Value.IsChecked!=true).Select(c=>c.Key).ToArray();
@@ -670,6 +683,14 @@ namespace DeskPill
             pageList.Items.RemoveAt(i);
             pageList.Items.Insert(j, item);
             pageList.SelectedIndex = j;
+            draft.PageOrder=pageList.Items.Cast<string>().ToArray();this.previewPreferences(draft,false);
+        }
+
+        internal void SyncStartupPreference(bool enabled)
+        {
+            draft.StartWithWindows=enabled;
+            if(startupChoice!=null)startupChoice.IsChecked=enabled;
+            startupTouched=false;
         }
 
         internal void OpenStartupOptions()
@@ -682,7 +703,7 @@ namespace DeskPill
 
         StackPanel NotificationOptions(IEnumerable<DesktopNotification> known)
         {
-            var p=Page("Notifications","Quiet controls for new arrivals. Recent notifications stay in memory until you clear them or close DeskPill.");
+            var p=Page("Notifications","Filtering changes apply on Save. Recent notifications stay in memory until you clear them or close DeskPill.");
             Check(p,"Quiet agent completion previews","AgentCompletionPeeks");
             Number(p,"Peek duration (seconds)","NotificationSeconds",2,15);
             Choice(p,"During focus sessions","FocusNotifications",new[]{"History only","Allow peeks"});
@@ -724,7 +745,7 @@ namespace DeskPill
 
         StackPanel Clipboard()
         {
-            var p = Page("Clipboard", "Clipboard history is captured locally while DeskPill is running. Ctrl+Alt+V opens search, selection and plain-text paste back to the app you came from.");
+            var p = Page("Clipboard", "Capture and history changes apply on Save. Clipboard history is captured locally while DeskPill is running. Ctrl+Alt+V opens search, selection and plain-text paste back to the app you came from.");
             Check(p, "Enable clipboard history", "ClipboardEnabled");
             Check(p, "Keep clipboard history after closing DeskPill", "KeepClipboard");
             Note(p, "Retention is limited to the latest 50 text entries. With persistence off, history stays in memory and is excluded from the saved state. Sensitive copied text may appear here; disable capture when needed.");
@@ -795,6 +816,8 @@ namespace DeskPill
         StackPanel About()
         {
             var p = Page("About & shortcuts", "DeskPill · a native Windows desktop island");
+            p.Children.Add(Ui.Button("Check for updates",UpdateWindow.Open,true));
+            Note(p,"Checks only when clicked. If a newer stable release exists, its portable ZIP downloads in the background and is verified. Installation stays in your control.");
             Note(p, "Media controls use available Windows media sessions. Brightness requires supported display hardware; volume and battery depend on system capabilities. Screen OCR uses Windows recognition support. Unsupported controls report their availability.");
             Note(p, "Clipboard capture runs only when enabled. Screen capture and selected files are used only for the action you request. Calendar feeds, lyrics, weather and Ask require network access when used.");
             Note(p, "Keyboard: Tab moves between controls; Enter activates the focused button; Escape closes settings without saving. Ctrl+Alt+V opens clipboard search and paste. Esc dismisses notification previews while you work in another app. See the island tooltips for other registered global shortcuts.");
@@ -823,19 +846,7 @@ namespace DeskPill
                     draft.ProtectedApiKey = AskService.ProtectKey(apiKey.Password.Trim());
                 else if (clearKey)
                     draft.ProtectedApiKey = "";
-                if (startupTouched)
-                {
-                    using (var key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"))
-                    {
-                        if (draft.StartWithWindows)
-                        {
-                            string executable = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
-                            key.SetValue("DeskPill", "\"" + executable + "\"");
-                        }
-                        else
-                            key.DeleteValue("DeskPill", false);
-                    }
-                }
+                if(startupTouched)StartupRegistration.SetEnabled(draft.StartWithWindows);
 
                 foreach (var f in typeof(Settings).GetFields(BindingFlags.Public | BindingFlags.Instance))
                     f.SetValue(state.Settings, f.GetValue(draft));

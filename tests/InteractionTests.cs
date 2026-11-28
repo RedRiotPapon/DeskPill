@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -46,6 +47,44 @@ class InteractionTests {
   });
   Test("Regular users never initialize agent services from housekeeping",delegate {
    var w=Island();try{Call(w,"TrackAgentContext");Call(w,"ObserveAgentTransitions");Check(Field(w,"agentHub")==null&&Field(w,"agentScreenTarget")==null&&Field(w,"agentSpeech")==null,"Agent housekeeping activated without a connection");}finally{Call(w,"Cleanup");}
+  });
+  Test("Playback feedback is immediate and rolls back a refused command without rebuilding Music",delegate {
+   var w=Island();try{var media=(MediaService)Field(w,"media");media.Current=new MediaSnapshot {Source="fixture",Title="Sample",Playing=true};Call(w,"RebuildCurrentPage",true);
+    var button=(Button)Field(w,"musicPlayButton");var page=Field(w,"currentPageVisual");var result=new TaskCompletionSource<bool?>();
+    var method=w.GetType().GetMethod("RequestMusicPlayback",Private);var task=(Task)method.Invoke(w,new object[]{new Func<bool,string,Task<bool?>>((desired,source)=>{Check(!desired&&source=="fixture","Wrong playback intent");return result.Task;})});
+    Check(((TextBlock)button.Content).Text=="\uE768"&&!task.IsCompleted,"Pause click waited for the media provider");
+    Call(w,"UpdateValues");Check(((TextBlock)button.Content).Text=="\uE768","Polling replaced pending playback feedback");
+    result.SetResult(true);var frame=new DispatcherFrame();var timer=new DispatcherTimer {Interval=TimeSpan.FromMilliseconds(10)};int ticks=0;timer.Tick+=delegate{if(task.IsCompleted||++ticks>100)frame.Continue=false;};timer.Start();Dispatcher.PushFrame(frame);timer.Stop();
+    Check(task.IsCompleted&&((TextBlock)button.Content).Text=="\uE769","Refused playback did not restore the real state");
+    Check(object.ReferenceEquals(page,Field(w,"currentPageVisual"))&&object.ReferenceEquals(button,Field(w,"musicPlayButton")),"Play/pause rebuilt the page");
+   }finally{Call(w,"Cleanup");}
+  });
+  Test("Startup tray preference synchronizes an open draft without writing registration",delegate {
+   var state=new AppState();var w=new SettingsWindow(state,delegate{},delegate{});try{Call(w,"SyncStartupPreference",true);Check(((Settings)Field(w,"draft")).StartWithWindows&&!(bool)Field(w,"startupTouched"),"Tray startup change was left stale in Settings");Check(!state.Settings.StartWithWindows,"Sync wrote the real preference without a tray action");}finally{w.Close();}
+  });
+  Test("General, pages and valid numbers preview live and Cancel restores saved presentation",delegate {
+   var state=new AppState();state.Settings.FastAnimations=true;var w=new IslandWindow(state,new StateStore(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"live-settings-fixture")),true,true);
+   try{Call(w,"SetOpen",false);Call(w,"ShowSettings");var settings=(SettingsWindow)Field(w,"settingsWindow");
+    Call(settings,"OpenSection","General");Controls<CheckBox>(settings).Single(c=>Convert.ToString(c.Content)=="Show clock").IsChecked=false;
+    Check(((Run)Field(w,"timeRun")).Text==""&&state.Settings.ShowClock,"Clock edit is blind or changed saved settings");
+    Controls<ComboBox>(settings).Single(c=>c.Items.Contains("Battery")&&c.Items.Contains("Water")).SelectedItem="None";
+    Check(((Ring)Field(w,"compactRing")).Visibility!=Visibility.Visible&&state.Settings.StatusRing=="Water","Ring choice is blind or stored early");
+    Call(settings,"OpenSection","Pages");Controls<CheckBox>(settings).Single(c=>Convert.ToString(c.Content)=="Water").IsChecked=false;
+    Check(!((string[])w.GetType().GetMethod("Order",Private).Invoke(w,null)).Contains("Water")&&state.Settings.VisiblePages().Contains("Water"),"Hidden page did not preview independently");
+    Check(!((Dictionary<string,Button>)Field(w,"dockPageButtons")).ContainsKey("Water"),"Hidden page stayed in the hover dock");
+    Call(settings,"OpenSection","Focus & water");Controls<TextBox>(settings).Single(t=>System.Windows.Automation.AutomationProperties.GetName(t)=="Daily water goal (ml)").Text="3000";
+    Check(((Settings)Field(w,"preferencesPreview")).WaterGoalMl==3000&&state.Settings.WaterGoalMl==2000,"Numeric goal did not preview");
+    Controls<Button>(settings).Single(b=>Convert.ToString(b.Content)=="Cancel").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+    Check(Field(w,"preferencesPreview")==null&&((Run)Field(w,"timeRun")).Text!=""&&((Ring)Field(w,"compactRing")).Visibility==Visibility.Visible,"Cancel did not restore runtime presentation");
+    Check(((Dictionary<string,Button>)Field(w,"dockPageButtons")).ContainsKey("Water"),"Cancel did not restore the hover dock");
+   }finally{Call(w,"Cleanup");}
+  });
+  Test("Hydration actions cannot persist an unsaved preview amount",delegate {
+   var w=Island();try{var state=(AppState)Field(w,"state");Call(w,"SelectPage","Water");var preview=new Settings {BottleMl=1000};Call(w,"PreviewPreferences",preview,false);
+    var drink=Controls<Button>(w).Single(b=>Convert.ToString(b.Content)=="+ Drink");Check(!drink.IsEnabled,"Uncommitted drink amount can be logged");
+    int before=state.WaterMl;drink.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Check(state.WaterMl==before,"Preview amount changed persistent hydration data");
+    Call(w,"PreviewPreferences",state.Settings,false);Check(Controls<Button>(w).Single(b=>Convert.ToString(b.Content)=="+ Drink").IsEnabled,"Cancel left hydration controls disabled");
+   }finally{Call(w,"Cleanup");}
   });
   Test("Size and shape preview stays staged, resets, and adapts the notch",delegate {
    var state=new AppState();int previews=0;var w=new SettingsWindow(state,delegate{},delegate{},null,null,delegate(Settings value,bool demo){previews++;});
@@ -363,7 +402,7 @@ class InteractionTests {
    Controls<Slider>(settings).Single(x=>Convert.ToString(x.Tag)=="MotionPace").Value=80;
    var preview=(Settings)Field(w,"preferencesPreview");var motion=Field(w,"motion");
    Check(preview.HoverOpenMs==270 && (double)motion.GetType().GetField("TimeScale").GetValue(motion)==.8 && state.Settings.HoverOpenMs==110,"Motion did not preview without saving");
-   settings.Close();Check((double)motion.GetType().GetField("TimeScale").GetValue(motion)==1 && ((Settings)Field(w,"preferencesPreview")).HoverOpenMs==110,"Cancel did not restore motion");Call(w,"Cleanup");
+   settings.Close();Check((double)motion.GetType().GetField("TimeScale").GetValue(motion)==1 && Field(w,"preferencesPreview")==null,"Cancel did not restore motion");Call(w,"Cleanup");
   });
   Test("Glass preview keeps content opaque and Cancel restores Classic",delegate {
    var w=Island();Call(w,"ShowSettings");var settings=(SettingsWindow)Field(w,"settingsWindow");

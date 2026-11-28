@@ -87,7 +87,7 @@ You need Windows, .NET Framework 4.8 and Windows SDK metadata (`Windows.winmd`).
 ```powershell
 .\build.ps1            # Compile to bin/DeskPill.exe
 .\build.ps1 -Test      # Build and run all test suites
-.\package.ps1          # Create dist/DeskPill-2.3.0-portable.zip
+.\package.ps1          # Create dist/DeskPill-2.4.0-portable.zip
 ```
 
 The solution is also available as `DeskPill.sln`. Full UI, media and OCR probes require an interactive Windows desktop; CI runs the deterministic suites. See [CONTRIBUTING.md](../CONTRIBUTING.md).
@@ -130,3 +130,11 @@ Saved preferences and agent connections live in `%LOCALAPPDATA%\DeskPill\state.j
 Settings includes a search bar for option names and descriptions. Try “startup”, “GPU”, “transparency” or “hover”. Select a result to open its page and scroll to the option. Ctrl+F focuses search, Enter opens the first result and Esc clears the query. Searching preserves unsaved edits; Save and Cancel keep their normal behavior. User-entered values and passwords are excluded from search.
 
 Settings → Size & shape previews 80–160% overall size, 150–240 logical-pixel idle width, Classic/Floating placement and Original/Rounded/Soft square corners. Text and expanded controls scale together; only the idle bar widens. Tiny overlap hiding stays compact. Shape changes use the same outline for the shell, rim and content clip. Reset restores 100%, 150 px, Classic and Original; Cancel restores saved geometry. Values are bounded for readable layouts and Windows display scaling still applies.
+
+The tray’s **Start with Windows** is a direct checked toggle. It saves immediately without opening Settings. If the registration or save fails, the preference and previous Run entry are restored. Changing startup inside Settings still waits for Save.
+
+Play/pause changes its glyph and visualizer feedback immediately without rebuilding Music. Native commands run in click order off the UI thread, separately from metadata/artwork reads. Feedback reconciles with the player, and a refused or timed-out command restores the observed state. A source app can still take time to change actual playback.
+
+Settings preview clock/mascot/status, placement and geometry, motion, visible pages and order, and valid timer/water values before Save. Cancel or closing restores the committed presentation. Invalid numeric input retains the last valid preview until corrected. Uncommitted settings are never written by background saves. Actions that log hydration or start a newly sized timer require saving that size first. Startup registration, dictation activation, notification/privacy monitoring, and external service settings remain explicit Save/setup actions.
+
+**Check for updates** is available in the tray and Settings → About & shortcuts. Only clicking it contacts GitHub. If a newer stable version exists, DeskPill downloads its official portable ZIP to `%LOCALAPPDATA%\DeskPill\updates`, checks size and SHA-256 from release metadata, and offers **Open download folder**. Progress and Cancel stay in a small separate window; repeated checks reuse a verified download. There is no automatic extraction, execution, installation or idle polling. Exit the old app, extract the ZIP and keep both executables together before running the new version. Your profile stays in the existing DeskPill data folder.

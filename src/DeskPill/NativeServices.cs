@@ -15,6 +15,19 @@ using Windows.Graphics.Imaging;
 
 namespace DeskPill
 {
+    public sealed class PlaybackCommandQueue
+    {
+        readonly object gate=new object();
+        Task tail=Task.FromResult(false);
+        public Task<bool?> Enqueue(Func<Task<bool?>> action)
+        {
+            lock(gate){
+                var next=tail.ContinueWith(previous=>action(),System.Threading.CancellationToken.None,TaskContinuationOptions.None,TaskScheduler.Default).Unwrap();
+                tail=next.ContinueWith(previous=>{},TaskScheduler.Default);return next;
+            }
+        }
+    }
+
     public sealed class MediaSnapshot
     {
         public string Title = "", Artist = "", Album = "", Source = "", Error = "";
@@ -36,6 +49,7 @@ namespace DeskPill
         readonly SemaphoreSlim gate = new SemaphoreSlim(1, 1);
         GlobalSystemMediaTransportControlsSessionManager manager;
         DateTime artworkReadUtc;
+        readonly PlaybackCommandQueue playbackQueue=new PlaybackCommandQueue();
         async Task<GlobalSystemMediaTransportControlsSession> Session()
         {
             if (manager == null)
@@ -95,6 +109,8 @@ namespace DeskPill
                     snapshot.Error = "Media unavailable (" + ex.GetType().Name + ")";
                 }
 
+                // Metadata/artwork can be slow. Read playback again at publication time.
+                try{var latest=await Session();if(latest!=null&&latest.SourceAppUserModelId==snapshot.Source)snapshot.Playing=latest.GetPlaybackInfo().PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;}catch{}
                 Current = snapshot;
             }
             finally
@@ -132,6 +148,30 @@ namespace DeskPill
             }
 
             await RefreshAsync();
+        }
+
+        public Task<bool?> SetPlayingAsync(bool playing,string source){return playbackQueue.Enqueue(()=>SetPlayingCoreAsync(playing,source));}
+        async Task<bool?> SetPlayingCoreAsync(bool playing,string source)
+        {
+            // Click order is captured before dispatching off the UI thread; metadata never blocks it.
+            try{
+                var s=await Session();
+                if(s==null||s.SourceAppUserModelId!=source)return null;
+                var info=s.GetPlaybackInfo();var controls=info.Controls;
+                bool actual=info.PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
+                if(actual==playing)return actual;
+                bool accepted=false;
+                if(playing&&controls.IsPlayEnabled)accepted=await s.TryPlayAsync();
+                else if(!playing&&controls.IsPauseEnabled)accepted=await s.TryPauseAsync();
+                else if(controls.IsPlayPauseToggleEnabled)accepted=await s.TryTogglePlayPauseAsync();
+                var deadline=DateTime.UtcNow.AddMilliseconds(1400);
+                do{
+                    actual=s.GetPlaybackInfo().PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
+                    if(!accepted||actual==playing)return actual;
+                    await Task.Delay(50);
+                }while(DateTime.UtcNow<deadline);
+                return s.GetPlaybackInfo().PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
+            }catch{return null;}
         }
 
         public Task PlayPauseAsync()

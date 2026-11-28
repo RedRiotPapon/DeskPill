@@ -1,7 +1,7 @@
 ﻿param([switch]$SkipBuild)
 $ErrorActionPreference = 'Stop'
 if (!$SkipBuild) { & (Join-Path $PSScriptRoot 'build.ps1') }
-$releaseDirectory = Join-Path $PSScriptRoot 'dist/DeskPill-2.3.0'
+$releaseDirectory = Join-Path $PSScriptRoot 'dist/DeskPill-2.4.0'
 New-Item -ItemType Directory -Force -Path $releaseDirectory | Out-Null
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'bin/DeskPill.exe') -Destination $releaseDirectory -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'bin/DeskPill.Speech.exe') -Destination $releaseDirectory -Force
@@ -12,7 +12,7 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'docs/AGENTS.md') -Destination $
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'docs/DICTATION.md') -Destination $releaseDirectory -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'docs/CAPABILITIES.md') -Destination (Join-Path $releaseDirectory 'CAPABILITIES.md') -Force
 @'
-DeskPill 2.3.0
+DeskPill 2.4.0
 
 Run DeskPill.exe. Hover over the top-center notch to expand it.
 Use dots/arrows or the mouse wheel to switch pages.
@@ -40,11 +40,12 @@ Hold Ctrl+Space while speaking; release to insert. The voice waveform stays insi
 Esc cancels. Disabling releases Ctrl+Space to other apps.
 Keep DeskPill.Speech.exe beside DeskPill.exe.
 Data: %LOCALAPPDATA%\DeskPill
-Startup registration is opt-in through Settings.
+Startup registration is opt-in through the checked tray toggle or Settings.
+Check for updates in the tray or Settings > About downloads a verified newer portable ZIP on request. Open its folder, exit the old app, and extract both executables together.
 
 Windows 10/11 and .NET Framework 4.8 are required. No installation is needed.
 See README.md and CAPABILITIES.md for usage and current limitations.
 '@ | Set-Content -LiteralPath (Join-Path $releaseDirectory 'START-HERE.txt') -Encoding UTF8
-$archive = Join-Path $PSScriptRoot 'dist/DeskPill-2.3.0-portable.zip'
+$archive = Join-Path $PSScriptRoot 'dist/DeskPill-2.4.0-portable.zip'
 Compress-Archive -Path (Join-Path $releaseDirectory '*') -DestinationPath $archive -Force
 Write-Host ('Packaged ' + $archive)

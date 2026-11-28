@@ -223,7 +223,7 @@ namespace DeskPill
             this.store = store;
             this.preview = preview;
             this.capture = capture;
-            Ui.MotionEnabled = !capture && !state.Settings.FastAnimations;
+            Ui.MotionEnabled = !capture && !MotionPreferences.FastAnimations;
 
             motion = new IslandMotion(shell, rim, contentHost, OnMotionFrame);
             motion.TimeScale=state.Settings.MotionPace/100.0;
@@ -597,14 +597,15 @@ namespace DeskPill
                     Show();
                 }));
             });
+            menu.Items.Add("Check for updates…",null,delegate{Dispatcher.BeginInvoke(new Action(UpdateWindow.Open));});
             menu.Items.Add("Settings…", null, delegate
             {
                 Dispatcher.BeginInvoke(new Action(ShowSettings));
             });
-            menu.Items.Add("Start with Windows…", null, delegate
-            {
-                Dispatcher.BeginInvoke(new Action(delegate{ShowSettings();if(settingsWindow!=null)settingsWindow.OpenStartupOptions();}));
-            });
+            var startupItem=new Forms.ToolStripMenuItem("Start with Windows") {Checked=state.Settings.StartWithWindows};
+            startupItem.Click+=delegate {Dispatcher.BeginInvoke(new Action(delegate{ToggleStartup();startupItem.Checked=state.Settings.StartWithWindows;}));};
+            menu.Opening+=delegate {startupItem.Checked=state.Settings.StartWithWindows;};
+            menu.Items.Add(startupItem);
             menu.Items.Add("Ask DeskPill", null, delegate
             {
                 Dispatcher.BeginInvoke(new Action(ShowInlineAsk));
@@ -747,7 +748,7 @@ namespace DeskPill
 
         NotchPose RestingClosedPose()
         {
-            return !gameModeActive && (gameDetected || state.Settings.MinimalNotch || tabOverlapping) ? NotchPose.Tiny : NotchPose.Compact;
+            return !gameModeActive && (gameDetected || MotionPreferences.MinimalNotch || tabOverlapping) ? NotchPose.Tiny : NotchPose.Compact;
         }
 
         void TargetDimensions(NotchPose targetPose, out double w, out double h, out bool showDock, out bool showHud)
@@ -842,7 +843,7 @@ namespace DeskPill
         void Place()
         {
             var screens = Forms.Screen.AllScreens;
-            var screen = screens.FirstOrDefault(s => s.DeviceName == state.Settings.Monitor) ?? Forms.Screen.PrimaryScreen;
+            var screen = screens.FirstOrDefault(s => s.DeviceName == MotionPreferences.Monitor) ?? Forms.Screen.PrimaryScreen;
             double dpiX = 96.0, dpiY = 96.0;
             try
             {
@@ -913,7 +914,7 @@ namespace DeskPill
                 return;
 
             bool detected = false;
-            if (state.Settings.AutoShrinkOnTabs && hwnd != IntPtr.Zero)
+            if (MotionPreferences.AutoShrinkOnTabs && hwnd != IntPtr.Zero)
             {
                 // WPF performs the actual per-monitor DPI and layout transform mapping.
                 double width = DesiredCompactWidth();
@@ -927,7 +928,7 @@ namespace DeskPill
                 }
                 catch { return; }
                 finally { overlapPolling = false; }
-                if (!IsLoaded || !state.Settings.AutoShrinkOnTabs || gameDetected || pose == NotchPose.Dictation || (dictation!=null && dictation.Active)) return;
+                if (!IsLoaded || !MotionPreferences.AutoShrinkOnTabs || gameDetected || pose == NotchPose.Dictation || (dictation!=null && dictation.Active)) return;
             }
 
             if (detected)
@@ -1063,7 +1064,7 @@ namespace DeskPill
                     hoverBlockedUntilExit = false;
                     if (!motion.IsAnimating && !closeTimer.IsEnabled) hoverTimer.Stop();
                 }
-                else if (!hoverBlockedUntilExit && state.Settings.OpenMode == "Hover")
+                else if (!hoverBlockedUntilExit && MotionPreferences.OpenMode == "Hover")
                 {
                     if (hoverIntentSince == DateTime.MinValue) hoverIntentSince = now;
                     if ((now - hoverIntentSince).TotalMilliseconds >= MotionPreferences.HoverOpenMs)
@@ -1118,7 +1119,7 @@ namespace DeskPill
 
             if (compactMascot != null)
             {
-                bool mascotActive = !open && pose == NotchPose.Compact && compactRev > 0.35 && !media.Current.Playing && state.Settings.ShowMascot && IsVisible && !capture;
+                bool mascotActive = !open && pose == NotchPose.Compact && compactRev > 0.35 && !MusicPlaying && MotionPreferences.ShowMascot && IsVisible && !capture;
                 compactMascot.SetActive(mascotActive);
             }
 
@@ -1289,13 +1290,13 @@ namespace DeskPill
         {
             get
             {
-                return !capture && IsLoaded && IsVisible && !state.Settings.FastAnimations && SystemParameters.ClientAreaAnimation;
+                return !capture && IsLoaded && IsVisible && !MotionPreferences.FastAnimations && SystemParameters.ClientAreaAnimation;
             }
         }
 
         string[] Order()
         {
-            var valid = state.Settings.VisiblePages().Where(icons.ContainsKey).Distinct().ToArray();
+            var valid = MotionPreferences.VisiblePages().Where(icons.ContainsKey).Distinct().ToArray();
             return valid.Length > 0 ? valid : new[] { "Music" };
         }
 
@@ -1378,7 +1379,7 @@ namespace DeskPill
             tinyCatcher.MouseEnter += delegate { EnsureHoverWatch(); PollHoverState(); };
             tinyCatcher.MouseLeftButtonUp += delegate
             {
-                pinned = state.Settings.OpenMode == "Click";
+                pinned = MotionPreferences.OpenMode == "Click";
                 SyncDockStates();
                 SetOpen(true);
             };
@@ -1478,7 +1479,7 @@ namespace DeskPill
             double clamped = Math.Max(0.0, Math.Min(1.0, targetRatio));
             string finalText = string.IsNullOrEmpty(suffix) ? "" : ((int)Math.Round(clamped * 100.0)) + suffix;
             if (gameDetected || (dictation!=null && dictation.Active))return;
-            if (!state.Settings.ShowHudPopups || open || dragHovering)
+            if (!MotionPreferences.ShowHudPopups || open || dragHovering)
             {
                 if (open)
                 {
@@ -1516,7 +1517,7 @@ namespace DeskPill
                 return;
             if (pose == NotchPose.NotificationPeek) return;
             if (gameDetected || (dictation!=null && dictation.Active))return;
-            if (!state.Settings.ShowHudPopups || open || dragHovering)
+            if (!MotionPreferences.ShowHudPopups || open || dragHovering)
             {
                 if (open)
                 {
@@ -1738,7 +1739,7 @@ namespace DeskPill
             compact.MouseLeftButtonUp += delegate
             {
                 if(gameModeActive)return;
-                pinned = state.Settings.OpenMode == "Click";
+                pinned = MotionPreferences.OpenMode == "Click";
                 SyncDockStates();
                 SetOpen(true);
             };
@@ -2064,6 +2065,7 @@ namespace DeskPill
             smallValue = null;
             pageRing = null;
             pageContent = null;
+            musicPlayButton=null;musicIconPlaying=null;
             mediaProgress = null;
             mediaElapsed = mediaRemaining = focusStateText = null;
             focusProgress = waterProgress = null;
@@ -2222,7 +2224,11 @@ namespace DeskPill
             lyrics.Background = Brushes.Transparent;
             Put(target, lyrics, 46, 82);
             Put(target, TransportButton("\uE892", "Previous track", media.PreviousAsync, 19), 132, 80);
-            Put(target, TransportButton(current.Playing ? "\uE769" : "\uE768", "Play or pause", media.PlayPauseAsync, 21), 180, 80);
+            // This path updates in place; metadata transports may still rebuild the page.
+            musicPlayButton=Ui.IconButton(MusicPlaying?"\uE769":"\uE768","Play or pause",async delegate{await ToggleMusicPlayback();});
+            musicPlayButton.Width=38;musicPlayButton.Height=musicPlayButton.MinHeight=32;musicPlayButton.Margin=new Thickness(0);musicPlayButton.Background=Brushes.Transparent;
+            ((TextBlock)musicPlayButton.Content).FontSize=21;
+            Put(target,musicPlayButton,180,80);UpdateMusicPlayback();
             Put(target, TransportButton("\uE893", "Next track", media.NextAsync, 19), 228, 80);
             Button volume = null;
             volume = Ui.IconButton("\uE767", "Volume", delegate
@@ -2324,12 +2330,15 @@ namespace DeskPill
             Put(target, Ui.Text("This round", 10, Ui.Muted), 194, 16);
             var start = Ui.Button(focus.Running ? "\u23F8 Pause" : "\u25B6 Start", delegate
             {
+                if(!focus.Running&&PreviewTimerChanged){Notify("Save the timer duration before starting.");return;}
                 if (focus.Running) focus.Pause(DateTime.UtcNow); else focus.Start(DateTime.UtcNow);
                 Save(); RebuildCurrentPage(true);
             });
+            start.IsEnabled=focus.Running||!PreviewTimerChanged;if(!start.IsEnabled)start.ToolTip="Save the timer duration before starting.";
             start.Width = 60; start.MinHeight = start.Height = 22; start.Padding = new Thickness(4, 0, 4, 0);
             start.Background = PageAccent("Focus"); start.Foreground = Ui.Hex("#FDFDFD"); Put(target, start, 278, 14);
             var reset = Ui.IconButton("\uE777", "Reset focus timer", delegate { focus.Reset(); Save(); RebuildCurrentPage(true); });
+            reset.IsEnabled=!PreviewTimerChanged;
             reset.Width = reset.Height = reset.MinHeight = 22; reset.Padding = new Thickness(0); Put(target, reset, 342, 14);
             for (int i = 0; i < 5; i++)
             {
@@ -2339,6 +2348,7 @@ namespace DeskPill
                 label.Width = 30; label.TextAlignment = TextAlignment.Center; Put(target, label, 194 + i * 34, 70);
             }
             var skip = Ui.Button("Skip phase →", delegate { focus.Skip(); Save(); RebuildCurrentPage(true); });
+            skip.IsEnabled=!PreviewTimerChanged;
             skip.ToolTip = "Skip this phase";
             skip.Background = Brushes.Transparent; skip.Foreground = Ui.Muted; skip.Padding = new Thickness(0); skip.MinHeight = 20;
             Put(target, skip, 194, 90);
@@ -2348,7 +2358,7 @@ namespace DeskPill
         {
             largeValue = Ui.Text("0.0", 28, Ui.White); largeValue.FontWeight = FontWeights.Bold; largeValue.Width = 88;
             Put(target, largeValue, 32, 10);
-            var goal = Ui.Text("/ " + (state.Settings.WaterGoalMl / 1000.0).ToString("0.0", CultureInfo.InvariantCulture) + " L", 12, Ui.Muted);
+            var goal = Ui.Text("/ " + (MotionPreferences.WaterGoalMl / 1000.0).ToString("0.0", CultureInfo.InvariantCulture) + " L", 12, Ui.Muted);
             Put(target, goal, 95, 18);
             smallValue = Ui.Text("Today · 0%", 11, Ui.Muted); smallValue.Width = 154; Put(target, smallValue, 32, 45);
             waterProgress = new ProgressBar { Width = 150, Height = 4, Maximum = 1, Foreground = PageAccent("Water"), Background = Ui.Line, BorderThickness = new Thickness(0) };
@@ -2358,10 +2368,13 @@ namespace DeskPill
             Put(target, pageRing, 248, 25);
             var drink = Ui.Button("+ Drink", delegate
             {
+                if(preferencesPreview!=null&&MotionPreferences.BottleMl!=state.Settings.BottleMl){Notify("Save the bottle size before logging a drink.");return;}
                 state.AddWater(state.Settings.BottleMl, DateTime.Now);
                 waterReminder = DateTime.Now.AddMinutes(state.Settings.ReminderMinutes);
                 Save(); UpdateValues();
             });
+            drink.IsEnabled=preferencesPreview==null||MotionPreferences.BottleMl==state.Settings.BottleMl;
+            if(!drink.IsEnabled)drink.ToolTip="Save the bottle size before logging a drink.";
             drink.Background = Ui.Hex("#124B7C"); drink.Padding = new Thickness(10, 3, 10, 3); drink.MinHeight = 26;
             var settings = Ui.Button("Settings", ShowSettings); settings.Padding = new Thickness(8, 3, 8, 3); settings.MinHeight = 26;
             var snooze = Ui.IconButton("\uE708", "Snooze water reminder", delegate { waterReminder = DateTime.Now.AddMinutes(30); Notify("Water reminder snoozed for 30 minutes"); });
@@ -2877,7 +2890,7 @@ namespace DeskPill
             var todayTasks = state.Tasks.Where(t => !t.Done).Take(3).Select(t => "• " + t.Title).ToList();
             string leftText = "TASKS · " + done + "/" + state.Tasks.Count + "\n"
                 + (todayTasks.Count == 0 ? "All caught up." : string.Join("\n", todayTasks))
-                + "\n\nHYDRATION · " + state.WaterMl + " / " + state.Settings.WaterGoalMl + " ml\n"
+                + "\n\nHYDRATION · " + state.WaterMl + " / " + MotionPreferences.WaterGoalMl + " ml\n"
                 + "FOCUS · " + state.CompletedFocus + " rounds completed\n"
                 + batLine
                 + "MOON · " + MoonPhaseSummary(DateTime.UtcNow);
@@ -3150,10 +3163,10 @@ namespace DeskPill
         void UpdateValues()
         {
             var now = DateTime.Now;
-            double progress = state.Settings.StatusRing == "Tasks" ? (state.Tasks.Count == 0 ? 0 : (double)state.Tasks.Count(t => t.Done) / state.Tasks.Count) : state.Settings.StatusRing == "Battery" ? Math.Max(0, SystemService.BatteryPercent()) / 100.0 : state.Settings.StatusRing == "None" ? 0 : state.Settings.StatusRing == "Focus" ? 1 - focus.Remaining(DateTime.UtcNow).TotalMinutes / (focus.Phase == "Focus" ? state.Settings.FocusMinutes : focus.Phase == "Short break" ? state.Settings.ShortBreakMinutes : state.Settings.LongBreakMinutes) : (double)state.WaterMl / state.Settings.WaterGoalMl;
+            double progress = MotionPreferences.StatusRing == "Tasks" ? (state.Tasks.Count == 0 ? 0 : (double)state.Tasks.Count(t => t.Done) / state.Tasks.Count) : MotionPreferences.StatusRing == "Battery" ? Math.Max(0, SystemService.BatteryPercent()) / 100.0 : MotionPreferences.StatusRing == "None" ? 0 : MotionPreferences.StatusRing == "Focus" ? 1 - DisplayFocusRemaining.TotalMinutes / (focus.Phase == "Focus" ? MotionPreferences.FocusMinutes : focus.Phase == "Short break" ? MotionPreferences.ShortBreakMinutes : MotionPreferences.LongBreakMinutes) : (double)state.WaterMl / MotionPreferences.WaterGoalMl;
 
             if(gameModeActive)progress=0;
-            string sourceName = gameModeActive?"Game":state.Settings.StatusRing;
+            string sourceName = gameModeActive?"Game":MotionPreferences.StatusRing;
             string glyph = sourceName == "Game" ? "\uE7FC" : sourceName == "Tasks" ? "\uE73E" : sourceName == "Battery" ? "\uE83F" : sourceName == "Focus" ? "\uE916" : "\uEB42";
             Brush accent = sourceName == "Game" ? Ui.Hex("#8FD8E8") : sourceName == "Tasks" ? PageAccent("Tasks") : sourceName == "Focus" ? PageAccent("Focus") : sourceName == "Battery" ? Ui.Green : Ui.Hex("#379CF8");
             foreach (var ring in new[] { compactRing, expandedRing })
@@ -3167,13 +3180,14 @@ namespace DeskPill
             }
 
             UpdateAgentIndicator();
-            bool isPlaying = media.Current.Playing && !gameModeActive;
+            UpdateMusicPlayback();
+            bool isPlaying = MusicPlaying && !gameModeActive;
             if (compactEq != null)
                 compactEq.Playing = isPlaying;
             if (expandedEq != null)
                 expandedEq.Playing = isPlaying;
 
-            bool showMascot = !gameModeActive && !isPlaying && state.Settings.ShowMascot;
+            bool showMascot = !gameModeActive && !isPlaying && MotionPreferences.ShowMascot;
             if (compactMascot != null && compactEq != null)
             {
                 compactMascot.Visibility = showMascot ? Visibility.Visible : Visibility.Collapsed;
@@ -3187,11 +3201,11 @@ namespace DeskPill
                 else if (now < toastUntil)
                     compactText.Text = toast;
                 else if (focus.Running)
-                    compactText.Text = FormatTime(focus.Remaining(DateTime.UtcNow));
+                    compactText.Text = FormatTime(DisplayFocusRemaining);
                 else if (isPlaying)
-                    compactText.Text = state.Settings.ShowClock ? now.ToString("h:mm tt") : "Playing";
+                    compactText.Text = MotionPreferences.ShowClock ? now.ToString("h:mm tt") : "Playing";
                 else
-                    compactText.Text = state.Settings.ShowClock ? now.ToString("h:mm tt") : "DeskPill";
+                    compactText.Text = MotionPreferences.ShowClock ? now.ToString("h:mm tt") : "DeskPill";
 
                 double desiredCompactW = DesiredCompactWidth() - 18.0;
                 if (compact != null && Math.Abs(compact.Width - desiredCompactW) > 0.5)
@@ -3219,7 +3233,7 @@ namespace DeskPill
                     timeRun.Text = toast;
                     timeRun.Foreground = Ui.Green;
                 }
-                else if (state.Settings.ShowClock)
+                else if (MotionPreferences.ShowClock)
                 {
                     dateRun.Text = now.ToString("ddd d MMM yyyy  ");
                     timeRun.Text = now.ToString("h:mm tt");
@@ -3237,10 +3251,10 @@ namespace DeskPill
 
             if (page == "Focus" && largeValue != null)
             {
-                var remaining = focus.Remaining(DateTime.UtcNow);
+                var remaining = DisplayFocusRemaining;
                 largeValue.Text = FormatTime(remaining);
                 smallValue.Text = focus.Phase + " · " + focus.Round + " of 4";
-                int total = focus.Phase == "Focus" ? state.Settings.FocusMinutes : focus.Phase == "Short break" ? state.Settings.ShortBreakMinutes : state.Settings.LongBreakMinutes;
+                int total = focus.Phase == "Focus" ? MotionPreferences.FocusMinutes : focus.Phase == "Short break" ? MotionPreferences.ShortBreakMinutes : MotionPreferences.LongBreakMinutes;
                 if (focusProgress != null) focusProgress.Value = Math.Max(0, Math.Min(1, 1 - remaining.TotalMinutes / total));
                 if (focusStateText != null) focusStateText.Text = total + " min · " + (focus.Running ? "Running" : "Ready");
             }
@@ -3248,10 +3262,10 @@ namespace DeskPill
             if (page == "Water" && largeValue != null)
             {
                 largeValue.Text = (state.WaterMl / 1000.0).ToString("0.0", CultureInfo.InvariantCulture);
-                smallValue.Text = "Today · " + (int)(100.0 * state.WaterMl / state.Settings.WaterGoalMl) + "% · " + state.Settings.BottleMl + " ml / drink";
-                if (waterProgress != null) waterProgress.Value = Math.Min(1, (double)state.WaterMl / state.Settings.WaterGoalMl);
-                pageRing.Center = Math.Min(999, (int)(100.0 * state.WaterMl / state.Settings.WaterGoalMl)) + "%";
-                pageRing.Progress = (double)state.WaterMl / state.Settings.WaterGoalMl;
+                smallValue.Text = "Today · " + (int)(100.0 * state.WaterMl / MotionPreferences.WaterGoalMl) + "% · " + MotionPreferences.BottleMl + " ml / drink";
+                if (waterProgress != null) waterProgress.Value = Math.Min(1, (double)state.WaterMl / MotionPreferences.WaterGoalMl);
+                pageRing.Center = Math.Min(999, (int)(100.0 * state.WaterMl / MotionPreferences.WaterGoalMl)) + "%";
+                pageRing.Progress = (double)state.WaterMl / MotionPreferences.WaterGoalMl;
             }
         }
 
@@ -3340,7 +3354,7 @@ namespace DeskPill
                 await RefreshMedia();
             if (ticks % 3 == 0)
             {
-                bool hide = !gameDetected && !(dictation!=null && dictation.Active) && state.Settings.HideFullscreen && !preview && NativeMethods.IsForegroundFullscreen(hwnd);
+                bool hide = !gameDetected && !(dictation!=null && dictation.Active) && MotionPreferences.HideFullscreen && !preview && NativeMethods.IsForegroundFullscreen(hwnd);
                 if (hide && IsVisible)
                     Hide();
                 else if (!hide && !IsVisible)
@@ -3402,7 +3416,7 @@ namespace DeskPill
 
         void Chime()
         {
-            if (state.Settings.Sound)
+            if (MotionPreferences.Sound)
                 System.Media.SystemSounds.Asterisk.Play();
         }
 
@@ -3414,7 +3428,7 @@ namespace DeskPill
             try
             {
                 await Task.Run(() => media.RefreshAsync());
-                string identity = media.Current.Title + media.Current.Artist + media.Current.Playing;
+                string identity = media.Current.Source+"\n"+media.Current.Title+"\n"+media.Current.Artist+"\n"+media.Current.Album;
                 if (identity != lastMedia)
                 {
                     lastMedia = identity;
@@ -3423,6 +3437,7 @@ namespace DeskPill
                     else
                         UpdateValues();
                 }
+                else UpdateValues();
             }
             catch (Exception)
             {
@@ -3468,9 +3483,9 @@ namespace DeskPill
             int previousFocus = state.Settings.FocusMinutes;
             settingsWindow = new SettingsWindow(state, delegate
             {
-                preferencesPreview=null;
+                preferencesPreview=null;previewOriginalPage=null;
                 motion.TimeScale=state.Settings.MotionPace/100.0;
-                Ui.MotionEnabled = !capture && !state.Settings.FastAnimations;
+                Ui.MotionEnabled = !capture && !MotionPreferences.FastAnimations;
                 state.Normalize(DateTime.Now);
                 ApplyTheme();
                 if (!focus.Running && focus.Phase == "Focus" && focus.Remaining(DateTime.UtcNow) == TimeSpan.FromMinutes(previousFocus))
@@ -3609,17 +3624,19 @@ namespace DeskPill
             Place();
             SnapPoseImmediate();
             UpdateValues();
-            if (!detected && !capture && !preview && state.Settings.HideFullscreen && NativeMethods.IsForegroundFullscreen(hwnd) && IsVisible && (dictation == null || !dictation.Active))
+            if (!detected && !capture && !preview && MotionPreferences.HideFullscreen && NativeMethods.IsForegroundFullscreen(hwnd) && IsVisible && (dictation == null || !dictation.Active))
                 Hide();
         }
 
         async void PreviewPreferences(Settings settings, bool demonstrate)
         {
             int revision=++motionDemoRevision;
-            preferencesPreview=settings;motion.TimeScale=settings.MotionPace/100.0;
+            bool restoring=object.ReferenceEquals(settings,state.Settings);
+            preferencesPreview=restoring?null:settings;motion.TimeScale=settings.MotionPace/100.0;
             closeTimer.Interval=TimeSpan.FromMilliseconds(settings.HoverCloseMs);
-            bool geometryChanged=Math.Abs(motionScalePreview-settings.Scale)>.001||motionShapePreview!=settings.NotchShape||motionWidthPreview!=settings.CompactWidth||motionStylePreview!=settings.Style;
-            if(geometryChanged){motionScalePreview=settings.Scale;motionShapePreview=settings.NotchShape;motionWidthPreview=settings.CompactWidth;motionStylePreview=settings.Style;Place();UpdateValues();SnapPoseImmediate();}
+            bool geometryChanged=Math.Abs(motionScalePreview-settings.Scale)>.001||motionShapePreview!=settings.NotchShape||motionWidthPreview!=settings.CompactWidth||motionStylePreview!=settings.Style||motionOffsetPreview!=settings.OffsetY||motionMonitorPreview!=settings.Monitor;
+            if(geometryChanged){motionOffsetPreview=settings.OffsetY;motionMonitorPreview=settings.Monitor;motionScalePreview=settings.Scale;motionShapePreview=settings.NotchShape;motionWidthPreview=settings.CompactWidth;motionStylePreview=settings.Style;Place();UpdateValues();SnapPoseImmediate();}
+            PreviewPresentation(settings,restoring);
             if(demonstrate){SetOpen(false);await Task.Delay(180);if(settingsWindow!=null && revision==motionDemoRevision)SetOpen(true);}
         }
 
