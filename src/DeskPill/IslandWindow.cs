@@ -610,7 +610,7 @@ namespace DeskPill
             gameModeItem.Click += delegate {Dispatcher.BeginInvoke(new Action(ToggleGameMode));};
             menu.Opening += delegate {gameModeItem.Checked=state.Settings.GameOverlay;};
             menu.Items.Add(gameModeItem);
-            var dictationEnabledItem=new Forms.ToolStripMenuItem("Enable dictation · Win+Space");
+            var dictationEnabledItem=new Forms.ToolStripMenuItem("Enable dictation · Ctrl+Space");
             dictationEnabledItem.Click+=delegate{Dispatcher.BeginInvoke(new Action(delegate{SetDictationEnabled(!state.Settings.DictationEnabled);}));};
             var dictateNowItem=new Forms.ToolStripMenuItem("Start / stop dictation");
             dictateNowItem.Click+=delegate{Dispatcher.BeginInvoke(new Action(delegate{if(dictation!=null)dictation.Toggle();}));};
@@ -660,7 +660,7 @@ namespace DeskPill
             AddMenu(menu, "Today & calendar", ShowInlineToday);
             AddMenu(menu, "Ask DeskPill    Ctrl+Alt+Space", ShowInlineAsk);
             AddMenu(menu, "Copy text from screen    Ctrl+Alt+T", StartOcr);
-            AddMenu(menu, "Dictation    Win+Space (optional)", delegate {if(dictation!=null)dictation.Toggle();});
+            AddMenu(menu, "Dictation    Ctrl+Space (optional)", delegate {if(dictation!=null)dictation.Toggle();});
             AddMenu(menu, "Clipboard palette    Ctrl+Alt+V", ShowClipboardPalette);
             AddMenu(menu, "Recent notifications", ShowRecentNotifications);
             AddMenu(menu, "Notification access…", async delegate { await RequestNotificationAccess(); });

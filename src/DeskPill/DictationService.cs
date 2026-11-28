@@ -69,10 +69,10 @@ namespace DeskPill
         public bool ToggleRequested { get; private set; }
         public bool FinishRequested { get; private set; }
 
-        public bool Process(int key, bool down, bool windows, bool otherModifiers)
+        public bool Process(int key, bool down, bool control, bool otherModifiers)
         {
             ToggleRequested = FinishRequested = false;
-            if (!down && (key == 0x5B || key == 0x5C) && recording)
+            if (!down && (key == 0x11 || key == 0xA2 || key == 0xA3) && recording)
             {
                 recording = false;
                 FinishRequested = true;
@@ -94,7 +94,7 @@ namespace DeskPill
                 return true;
             }
 
-            if (!down || repeated || !windows || otherModifiers)
+            if (!down || repeated || !control || otherModifiers)
                 return false;
             held = recording = true;
             ToggleRequested = true;
@@ -443,7 +443,7 @@ namespace DeskPill
                 try{if(Directory.Exists(Root))Directory.Move(Root,backup);Directory.Move(stage,Root);replaced=true;}
                 finally{if(!replaced&&Directory.Exists(backup)&&!Directory.Exists(Root))Directory.Move(backup,Root);}
                 if(Directory.Exists(backup)&&Path.GetDirectoryName(Path.GetFullPath(backup))==Path.GetFullPath(parent))Directory.Delete(backup,true);
-                progress("English dictation is ready. Enable it and save to use Win+Space.");
+                progress("English dictation is ready. Enable it and save to use Ctrl+Space.");
             }
             finally
             {

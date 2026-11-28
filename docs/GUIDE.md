@@ -16,7 +16,7 @@ Download the portable ZIP from [Releases](https://github.com/RedRiotPapon/DeskPi
 | `Ctrl+Alt+Space` | Open Ask |
 | `Ctrl+Alt+T` | Select a screen region for OCR |
 | `Ctrl+Alt+V` | Search clipboard history and paste to the previous app |
-| `Win+Space` | Hold to speak, release to insert, when enabled |
+| `Ctrl+Space` | Hold to speak, release to insert, when enabled |
 
 Shortcuts can conflict with other applications; the tray menu remains available. Settings also offers click-to-open mode, display selection, scale, position, page order and visibility. Hiding a page keeps its data.
 
@@ -46,7 +46,7 @@ The conversation retains a bounded in-memory transcript. Use its **Conversation 
 
 For **Codex CLI**, the camera button attaches one reviewed screen image: select an area, the previous external window, or its monitor. A thumbnail shows the source, capture time and recipient. Click it to inspect or × to remove. The image goes to the selected tool only when you click **Send**. Window captures contain visible pixels and may include overlapping windows. Attachments remain separate per connection; successful sends and removal clean temporary files, while failed sends keep the draft available for retry. Provider history is managed by that provider.
 
-Hold-to-talk stays the default. Right-click the mic or visit **Settings → Dictation** for click-to-start/stop. Enabled **Win+Space** fills the open agent draft for review; elsewhere it keeps normal dictation behavior. Missing speech assets open the optional setup page. Neither voice nor screenshots send themselves.
+Hold-to-talk stays the default. Right-click the mic or visit **Settings → Dictation** for click-to-start/stop. Enabled **Ctrl+Space** fills the open agent draft for review; elsewhere it keeps normal dictation behavior. Missing speech assets open the optional setup page. Neither voice nor screenshots send themselves.
 
 Agent completions can show a brief, silent clickable notice when the notch is idle. **Settings → Notifications** can disable these. Focus quiet settings, fullscreen, games, overlap and active editors suppress them; the status dot remains available when appropriate. No agent discovery, agent process, microphone or capture starts for ordinary users without an explicit connection or action.
 
@@ -58,9 +58,9 @@ The speaker button opens a continuous system-volume slider. Click along its trac
 
 ## Optional English dictation
 
-Open **Settings → Dictation**, choose and download Vosk (about 54 MB) or Parakeet (about 749 MB), enable dictation and save. The tray menu also has a checked **Enable dictation · Win+Space** option; **Start / stop dictation** is available once enabled. Installing the speech pack alone does not enable the shortcut. Hold **Win+Space** while speaking, then release to transcribe and insert your words. **Esc** discards the recording. The notch itself shows the duration, an animated microphone and a waveform driven by actual microphone input; no listening window opens. If you switch apps, review stays inside the notch. The limit is 90 seconds.
+Open **Settings → Dictation**, choose and download Vosk (about 54 MB) or Parakeet (about 749 MB), enable dictation and save. The tray menu also has a checked **Enable dictation · Ctrl+Space** option; **Start / stop dictation** is available once enabled. Installing the speech pack alone does not enable the shortcut. Hold **Ctrl+Space** while speaking, then release to transcribe and insert your words. **Esc** discards the recording. The notch itself shows the duration, an animated microphone and a waveform driven by actual microphone input; no listening window opens. If you switch apps, review stays inside the notch. The limit is 90 seconds.
 
-While enabled, DeskPill takes over Win+Space, which Windows normally uses to switch input languages. Disabling dictation restores that shortcut. This is optional and off by default. No microphone capture runs while idle, and the speech model loads only for transcription in `DeskPill.Speech.exe`; that worker exits afterward to free its memory. Keep both executables together when extracting the portable ZIP.
+While enabled, DeskPill reserves Ctrl+Space, which may override the foreground app’s shortcut. Disabling releases it to other apps. Win+Space remains available for Windows language switching. This is optional and off by default. No microphone capture runs while idle, and the speech model loads only for transcription in `DeskPill.Speech.exe`; that worker exits afterward to free its memory. Keep both executables together when extracting the portable ZIP.
 
 Recognition runs locally using your selected model. Vosk is the lightweight default; Parakeet offers Auto, CPU or Vulkan GPU processing. Read the [model requirements](DICTATION.md) before downloading. The first setup needs internet access; speech audio does not leave your PC and is not written to a recording file. If you switch apps before transcription finishes, DeskPill offers review instead of unexpectedly pasting into another app. Names, accents and punctuation can need correction. See [speech components and licenses](../THIRD_PARTY_NOTICES.md).
 
@@ -87,7 +87,7 @@ You need Windows, .NET Framework 4.8 and Windows SDK metadata (`Windows.winmd`).
 ```powershell
 .\build.ps1            # Compile to bin/DeskPill.exe
 .\build.ps1 -Test      # Build and run all test suites
-.\package.ps1          # Create dist/DeskPill-2.2.0-portable.zip
+.\package.ps1          # Create dist/DeskPill-2.2.1-portable.zip
 ```
 
 The solution is also available as `DeskPill.sln`. Full UI, media and OCR probes require an interactive Windows desktop; CI runs the deterministic suites. See [CONTRIBUTING.md](../CONTRIBUTING.md).

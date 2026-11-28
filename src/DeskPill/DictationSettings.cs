@@ -12,7 +12,7 @@ namespace DeskPill
             if(!Save()){state.Settings.DictationEnabled=previous;return false;}
             if(!enabled)CancelAgentDictation();
             if(dictation!=null)dictation.Configure();
-            Notify(enabled?"Dictation enabled · hold Win+Space to speak; release to insert.":"Dictation disabled · Windows language shortcut restored.");
+            Notify(enabled?"Dictation enabled · hold Ctrl+Space to speak; release to insert.":"Dictation disabled · Ctrl+Space released to other apps.");
             return true;
         }
     }

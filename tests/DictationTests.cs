@@ -78,22 +78,34 @@ class DictationTests
             Check(Reject(() => DictationAudio.Wave(null)) && Reject(() => DictationAudio.Wave(new byte[3])) && Reject(() => DictationAudio.Wave(new byte[DictationAudio.MaxBytes + 2])), "Malformed and oversized audio is rejected");
             var backwards = new DictationShortcutGate();
             backwards.Process(0x20, true, false, false);
-            Check(!backwards.Process(0x20, true, true, false) && !backwards.ToggleRequested, "Space held before Win never starts recording on autorepeat");
+            Check(!backwards.Process(0x20, true, true, false) && !backwards.ToggleRequested, "Space held before Ctrl never starts recording on autorepeat");
             Check(!backwards.Process(0x20, false, true, false), "A plain Space press retains its matching release");
             var gate = new DictationShortcutGate();
             Check(!gate.Process(0x20, true, false, false) && !gate.Process(0x20, false, false, false), "Plain Space stays untouched");
-            Check(gate.Process(0x20, true, true, false) && gate.ToggleRequested, "Win+Space begins hold-to-talk");
+            Check(gate.Process(0x20, true, true, false) && gate.ToggleRequested, "Ctrl+Space begins hold-to-talk");
             Check(gate.Process(0x20, true, true, false) && !gate.ToggleRequested, "Held Space never restarts capture");
-            gate.Process(0x5B, false, false, false);
+            gate.Process(0xA2, false, false, false);
             var finish = typeof(DictationShortcutGate).GetProperty("FinishRequested");
-            Check(finish != null && (bool)finish.GetValue(gate, null), "Releasing Win first finishes recording");
-            Check(gate.Process(0x20, true, false, false) && !gate.ToggleRequested, "Space autorepeat after Win release stays swallowed");
+            Check(finish != null && (bool)finish.GetValue(gate, null), "Releasing Ctrl first finishes recording");
+            Check(gate.Process(0x20, true, false, false) && !gate.ToggleRequested, "Space autorepeat after Ctrl release stays swallowed");
             Check(gate.Process(0x20, false, false, false) && !(bool)finish.GetValue(gate, null), "Trailing Space release is swallowed without a second finish");
-            Check(!gate.Process(0x20, true, true, true) && !gate.Process(0x20, false, true, true), "Modified Windows shortcuts stay untouched");
+            Check(!gate.Process(0x20, true, true, true) && !gate.Process(0x20, false, true, true), "Extra-modifier Ctrl shortcuts stay untouched");
             Check(gate.Process(0x20, true, true, false) && gate.ToggleRequested, "A fresh chord begins again");
             Check(gate.Process(0x20, false, true, false) && (bool)finish.GetValue(gate, null), "Releasing Space first finishes recording");
-            gate.Process(0x5B, false, false, false);
-            Check(!(bool)finish.GetValue(gate, null), "Releasing Win after Space never finishes twice");
+            gate.Process(0xA2, false, false, false);
+            Check(!(bool)finish.GetValue(gate, null), "Releasing Ctrl after Space never finishes twice");
+            foreach (int controlKey in new[]{0x11,0xA2,0xA3})
+            {
+                var controlGate = new DictationShortcutGate();
+                Check(controlGate.Process(0x20,true,true,false) && controlGate.ToggleRequested, "Ctrl variant starts recording: " + controlKey);
+                controlGate.Process(controlKey,false,false,false);
+                Check(controlGate.FinishRequested, "Ctrl variant release finishes: " + controlKey);
+                Check(controlGate.Process(0x20,false,false,false) && !controlGate.FinishRequested, "Ctrl variant finishes only once: " + controlKey);
+            }
+            var windowsGate = new DictationShortcutGate();
+            windowsGate.Process(0x20,true,true,false);
+            windowsGate.Process(0x5B,false,true,true);
+            Check(!windowsGate.FinishRequested, "Windows key release does not finish Ctrl dictation");
             var insertion = typeof(DictationAudio).Assembly.GetType("DeskPill.DictationInsertion");
             Check(insertion != null, "Dictation retains the transcript until shortcut modifiers are released");
             var release = insertion.GetMethod("WaitForReleaseAsync");
@@ -102,11 +114,11 @@ class DictationTests
             Func<bool> held = () => ++polls < 3;
             Func<bool> foreground = () => true;
             var wait = (System.Threading.Tasks.Task<bool>)release.Invoke(null, new object[] { held, foreground, new Action(() => waiting = true), System.Threading.CancellationToken.None });
-            Check(wait.GetAwaiter().GetResult() && waiting && polls == 3, "Insertion waits for released Win before it can paste");
+            Check(wait.GetAwaiter().GetResult() && waiting && polls == 3, "Insertion waits for released Ctrl before it can paste");
             wait = (System.Threading.Tasks.Task<bool>)release.Invoke(null, new object[] { new Func<bool>(() => true), new Func<bool>(() => false), new Action(() =>
             {
             }), System.Threading.CancellationToken.None });
-            Check(!wait.GetAwaiter().GetResult(), "Changing foreground while Win is held switches to review");
+            Check(!wait.GetAwaiter().GetResult(), "Changing foreground while Ctrl is held switches to review");
             var abort = new System.Threading.CancellationTokenSource();
             wait = (System.Threading.Tasks.Task<bool>)release.Invoke(null, new object[] { new Func<bool>(() => true), foreground, new Action(() => abort.Cancel()), abort.Token });
             bool aborted = false;

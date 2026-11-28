@@ -580,7 +580,7 @@ namespace DeskPill
         StackPanel Dictation()
         {
             var p=Page("Dictation", "English speech to text, privately on your PC. Optional and off by default.");
-            Check(p,"Enable English dictation · Win+Space","DictationEnabled");
+            Check(p,"Enable English dictation · Ctrl+Space","DictationEnabled");
             Note(p,"Select a model, download its pack if needed, then Save. Selecting alone never downloads anything.");
             var installers=new List<Button>();var modelChoices=new List<RadioButton>();
             var cancel=Ui.Button("Cancel download",delegate{if(speechInstall!=null)speechInstall.Cancel();});cancel.Visibility=Visibility.Collapsed;
@@ -609,7 +609,7 @@ namespace DeskPill
             foreach(var radio in modelChoices)radio.Checked+=delegate{devicePanel.Visibility=SpeechModels.Normalize(draft.SpeechModel)=="Parakeet"?Visibility.Visible:Visibility.Collapsed;};
             p.Children.Add(devicePanel);
             p.Children.Add(cancel);
-            Note(p,"Hold Win+Space while speaking; release to insert. The microphone waveform appears inside the notch. Esc cancels. While enabled, this replaces Windows’ Win+Space language switch. Disabling restores it.");
+            Note(p,"Hold Ctrl+Space while speaking; release to insert. The microphone waveform appears inside the notch. Esc cancels. While enabled, Ctrl+Space is reserved for dictation and may override an app’s shortcut. Win+Space remains available for language switching.");
             Check(p,"Click to start and stop agent dictation (hold by default)","AgentVoiceToggle");
             Closed+=delegate{if(speechInstall!=null)speechInstall.Cancel();};
             Note(p,"Models load after you finish speaking in a separate worker, which exits afterward to free memory. No microphone access while idle. Recordings are limited to 90 seconds; Esc cancels. Speech fills an agent draft for review and never sends it automatically.");

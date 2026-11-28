@@ -1,6 +1,6 @@
 <p align="center"><img src="assets/DeskPill.svg" width="72" alt="DeskPill icon"></p>
 <h1 align="center">DeskPill</h1>
-<p align="center"><strong><a href="https://github.com/RedRiotPapon/DeskPill/releases/latest/download/DeskPill-2.2.0-portable.zip">⬇ Download for Windows</a></strong> · <a href="https://github.com/RedRiotPapon/DeskPill/releases/latest">Release notes</a></p>
+<p align="center"><strong><a href="https://github.com/RedRiotPapon/DeskPill/releases/latest/download/DeskPill-2.2.1-portable.zip">⬇ Download for Windows</a></strong> · <a href="https://github.com/RedRiotPapon/DeskPill/releases/latest">Release notes</a></p>
 <p align="center">Music, shortcuts and everyday tools in a compact Windows notch.</p>
 <p align="center">Windows 10/11 · Portable · Native WPF · MIT license</p>
 
@@ -20,25 +20,25 @@ Live theme previews, **Classic and Glass**, seven colored skins, and your own cu
 | **Music controls** | Artwork, playback, seeking and a smooth system-volume slider. |
 | **Notifications** | Quick previews, Open app, Copy, recent history and per-app interruption controls. |
 | **Clipboard & OCR** | Search copied text, paste to your previous app, or extract text from a screen region. |
-| **Offline dictation** | Choose lightweight Vosk or Parakeet Unified English, with CPU/GPU options for Parakeet. Hold **Win+Space**, speak, release to insert. |
+| **Offline dictation** | Choose lightweight Vosk or Parakeet Unified English, with CPU/GPU options for Parakeet. Hold **Ctrl+Space**, speak, release to insert. |
 | **Focus & daily tools** | Work/break timers, tasks, hydration reminders and a file shelf for drag and drop. |
 | **Game mode** | Optional translucent FPS bar; presentation tracing requires Windows trace access. |
 | **Agents Home · Experimental** | Connect Codex, Claude or Gemini CLI for reviewed prompts and voice drafts. Codex supports reviewed screen images. Hide the page if you don’t use agents. |
 
 ## Get started
 
-1. **[Download the ZIP](https://github.com/RedRiotPapon/DeskPill/releases/latest/download/DeskPill-2.2.0-portable.zip)**, extract it, and run `DeskPill.exe`. Keep `DeskPill.Speech.exe` beside it.
+1. **[Download the ZIP](https://github.com/RedRiotPapon/DeskPill/releases/latest/download/DeskPill-2.2.1-portable.zip)**, extract it, and run `DeskPill.exe`. Keep `DeskPill.Speech.exe` beside it.
 2. Hover over the notch to open it. Use the arrows, dots or wheel to navigate.
 3. Right-click the tray icon for **Settings** and **Start with Windows…**.
 
-Requires .NET Framework 4.8. The portable app is unsigned. Dictation shows model requirements before an explicit download and must be enabled; it takes over Windows’ Win+Space language shortcut while enabled. Startup and game mode are opt-in.
+Requires .NET Framework 4.8. The portable app is unsigned. Dictation shows model requirements before an explicit download and must be enabled; it reserves Ctrl+Space while enabled. Startup and game mode are opt-in.
 
 | Shortcut | Action |
 | --- | --- |
 | `Ctrl+Alt+Space` | Ask |
 | `Ctrl+Alt+T` | Screen OCR |
 | `Ctrl+Alt+V` | Clipboard search |
-| `Win+Space` | Hold to dictate, when enabled |
+| `Ctrl+Space` | Hold to dictate, when enabled |
 
 [Full guide](docs/GUIDE.md) · [Agent connections](docs/AGENTS.md) · [Music navigation](docs/MEDIA.md) · [Game mode](docs/GAMING.md) · [Capabilities & limits](docs/CAPABILITIES.md)
 

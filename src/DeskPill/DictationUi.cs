@@ -44,8 +44,6 @@ namespace DeskPill
         static extern IntPtr GetModuleHandle(string name);
         [DllImport("user32.dll")]
         static extern short GetAsyncKeyState(int key);
-        [DllImport("user32.dll")]
-        static extern void keybd_event(byte key, byte scan, uint flags, UIntPtr extra);
         readonly Hook callback;
         readonly Action toggle, finish, cancel;
         readonly Func<bool> active;
@@ -88,16 +86,13 @@ namespace DeskPill
                         return new IntPtr(1);
                     }
 
-                    bool consumed = gate.Process((int)key.key, down, Held(0x5B) || Held(0x5C), Held(0x10) || Held(0x11) || Held(0x12));
+                    bool consumed = gate.Process((int)key.key, down, Held(0x11) || Held(0xA2) || Held(0xA3), Held(0x10) || Held(0x12) || Held(0x5B) || Held(0x5C));
                     if (gate.FinishRequested)
                         finish();
                     if (consumed)
                     {
                         if (gate.ToggleRequested)
                         {
-                            // Mark the Win gesture as used so releasing Win does not open Start.
-                            keybd_event(0xFF, 0, 0, UIntPtr.Zero);
-                            keybd_event(0xFF, 0, 2, UIntPtr.Zero);
                             toggle();
                         }
 
