@@ -1,6 +1,7 @@
 <p align="center"><img src="assets/DeskPill.svg" width="72" alt="DeskPill icon"></p>
 <h1 align="center">DeskPill</h1>
 <p align="center"><strong><a href="https://github.com/RedRiotPapon/DeskPill/releases/latest/download/DeskPill-2.2.2-portable.zip">⬇ Download for Windows</a></strong> · <a href="https://github.com/RedRiotPapon/DeskPill/releases/latest">Release notes</a></p>
+<p align="center"><a href="https://github.com/RedRiotPapon/DeskPill/releases"><img src="https://img.shields.io/github/downloads/RedRiotPapon/DeskPill/total?style=flat-square&amp;label=Total%20downloads&amp;color=48c774" alt="Total GitHub release downloads"></a></p>
 <p align="center">Music, shortcuts and everyday tools in a compact Windows notch.</p>
 <p align="center">Windows 10/11 · Portable · Native WPF · MIT license</p>
 
