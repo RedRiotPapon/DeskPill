@@ -12,7 +12,7 @@ using Microsoft.Win32;
 
 namespace DeskPill
 {
-    public sealed class SettingsWindow : Window
+    public sealed partial class SettingsWindow : Window
     {
         readonly AppState state;
         readonly Action apply;
@@ -66,7 +66,12 @@ namespace DeskPill
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             var heading = Ui.Column(Ui.Text("DeskPill Settings", 25, Ui.White), Ui.Text("Make the island feel like yours.", 12, Ui.Muted));
             heading.Margin = new Thickness(0, 0, 0, 20);
-            root.Children.Add(heading);
+            var header=new Grid();
+            header.ColumnDefinitions.Add(new ColumnDefinition());
+            header.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(300)});
+            header.Children.Add(heading);
+            var search=BuildSettingsSearch();Grid.SetColumn(search,1);header.Children.Add(search);
+            root.Children.Add(header);
             var body = new Grid();
             body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(160) });
             body.ColumnDefinitions.Add(new ColumnDefinition());
@@ -77,7 +82,7 @@ namespace DeskPill
                 Margin = new Thickness(0, 0, 18, 0)
             };
             body.Children.Add(new ScrollViewer {Content=nav,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
-            var scroll = new ScrollViewer
+            var scroll = settingsScroll = new ScrollViewer
             {
                 Content = content,
                 Padding = new Thickness(4, 0, 12, 12)
@@ -136,8 +141,11 @@ namespace DeskPill
             button.Padding = new Thickness(12, 6, 8, 6);
             button.Click += delegate
             {
+                ClearSettingsSearch(false);
+                selectedSettingsPage=button;
                 content.Children.Clear();
                 content.Children.Add(panel);
+                settingsScroll.ScrollToTop();
                 foreach (var b in navigation)
                 {
                     b.Background = Ui.Hex("#151515");
@@ -148,6 +156,7 @@ namespace DeskPill
                 button.Foreground = Ui.Green;
             };
             navigation.Add(button);
+            IndexSettingsPage(title,panel,button);
             nav.Children.Add(button);
         }
 
@@ -289,6 +298,7 @@ namespace DeskPill
                 if(name=="Glass")
                 {
                     glassPanel=Page("Glass finish","Tint the surface while lettering stays opaque. This is translucent glass with a highlight, without background blur.");
+                    settingsSearchPrerequisites[glassPanel]=Tuple.Create("Choose the Glass theme to adjust this option.",(FrameworkElement)choice);
                     glassPanel.Margin=new Thickness(22,0,0,12);glassPanel.Visibility=draft.Theme=="Glass"?Visibility.Visible:Visibility.Collapsed;
                     Action glassPreview=delegate{Themes.ConfigureCustom(draft);this.previewTheme(draft.Theme);};
                     PreferenceSlider(glassPanel,"Surface opacity","GlassOpacity",35,95,"%",glassPreview);
@@ -603,6 +613,7 @@ namespace DeskPill
                 });install.Margin=new Thickness(0,8,0,0);installers.Add(install);card.Children.Add(install);p.Children.Add(Ui.Panel(card));
             }
             var devicePanel=new StackPanel();
+            settingsSearchPrerequisites[devicePanel]=Tuple.Create("Choose Parakeet Unified English to adjust this option.",(FrameworkElement)modelChoices.Last());
             Choice(devicePanel,"Parakeet processing device","SpeechBackend",new[]{"Auto","CPU","GPU"});
             Note(devicePanel,"Auto: use a compatible GPU when available, otherwise CPU; retry on CPU if the GPU fails. CPU: no graphics requirement. GPU: Vulkan-capable NVIDIA/AMD/Intel graphics, a current driver and recommended 2 GB free graphics memory. This is a recommendation, not a hard minimum. Forced GPU reports incompatibility instead of silently switching. Vosk always uses CPU.");
             devicePanel.Visibility=SpeechModels.Normalize(draft.SpeechModel)=="Parakeet"?Visibility.Visible:Visibility.Collapsed;

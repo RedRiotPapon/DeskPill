@@ -140,7 +140,7 @@ class UiTests
         var apps=new[]{new DesktopNotification {AppId="fixture.mail",AppName="Mail fixture"}};
         var w=new SettingsWindow(state,delegate{applied++;},null,null,apps);
         Dialog(w,delegate {
-            Click(w,"Notifications");Controls<TextBox>(w).Single().Text="4";
+            Click(w,"Notifications");Controls<TextBox>(w).Single(t=>System.Windows.Automation.AutomationProperties.GetName(t)!="Search settings").Text="4";
             Controls<ComboBox>(w).Single(c=>((string[])c.ItemsSource).Contains("Allow peeks")).SelectedItem="Allow peeks";
             Controls<CheckBox>(w).Single(c=>Convert.ToString(c.Content)=="Mail fixture").IsChecked=false;
             Click(w,"Pages");Controls<CheckBox>(w).Single(c=>Convert.ToString(c.Content)=="Water").IsChecked=false;Click(w,"Save changes");
@@ -368,7 +368,7 @@ class UiTests
         {
             Controls<ComboBox>(w).ElementAt(1).SelectedIndex = 2;
             Click(w, "Focus & water");
-            Controls<TextBox>(w).First().Text = "42";
+            Controls<TextBox>(w).First(t=>System.Windows.Automation.AutomationProperties.GetName(t)!="Search settings").Text = "42";
             Click(w, "Pages");
             Click(w, "Move down");
             Click(w, "Appearance");
@@ -399,7 +399,7 @@ class UiTests
         {
             Controls<ComboBox>(w).ElementAt(1).SelectedIndex = 2;
             Click(w, "Focus & water");
-            Controls<TextBox>(w).First().Text = "42";
+            Controls<TextBox>(w).First(t=>System.Windows.Automation.AutomationProperties.GetName(t)!="Search settings").Text = "42";
             Click(w, "Pages");
             Click(w, "Move down");
             Click(w, "Appearance");

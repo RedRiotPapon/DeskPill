@@ -47,6 +47,26 @@ class InteractionTests {
   Test("Regular users never initialize agent services from housekeeping",delegate {
    var w=Island();try{Call(w,"TrackAgentContext");Call(w,"ObserveAgentTransitions");Check(Field(w,"agentHub")==null&&Field(w,"agentScreenTarget")==null&&Field(w,"agentSpeech")==null,"Agent housekeeping activated without a connection");}finally{Call(w,"Cleanup");}
   });
+  Test("Settings search finds options and opens their page without losing drafts",delegate {
+   var state=new AppState();var w=new SettingsWindow(state,delegate{},delegate{});
+   try{var search=(TextBox)Field(w,"settingsSearch");Call(w,"OpenSection","General");
+    var box=Controls<CheckBox>(w).First(b=>Convert.ToString(b.Content).Contains("clock"));bool original=box.IsChecked==true;box.IsChecked=!original;
+    search.Text="GPU";Check(Controls<TextBlock>((StackPanel)Field(w,"content")).Any(t=>t.Text=="Search results"),"Search results not shown");
+    var results=(List<Button>)Field(w,"settingsSearchResults");Check(results.Any(b=>Convert.ToString(b.ToolTip)=="Open Dictation"),"GPU search missed dictation");
+    results.First(b=>Convert.ToString(b.ToolTip)=="Open Dictation").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+    Check(search.Text==""&&Convert.ToString(((Button)Field(w,"selectedSettingsPage")).Content)=="Dictation","Result did not navigate");
+    Call(w,"OpenSection","General");Check(box.IsChecked==!original&&state.Settings.ShowClock==original,"Searching changed or discarded a staged option");
+    search.Text="transparency";Check(((List<Button>)Field(w,"settingsSearchResults")).Any(b=>Convert.ToString(b.ToolTip)=="Open Appearance"),"Transparency alias missed opacity");
+    search.Text="Surface opacity";Check(Controls<TextBlock>((StackPanel)Field(w,"content")).Any(t=>t.Text.Contains("Choose the Glass theme")),"Hidden opacity lacks prerequisite guidance");
+    ((List<Button>)Field(w,"settingsSearchResults")).First().RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Check(((Settings)Field(w,"draft")).Theme=="Classic","Search changed the selected theme");
+    search.Text="Parakeet processing device";Check(Controls<TextBlock>((StackPanel)Field(w,"content")).Any(t=>t.Text.Contains("Choose Parakeet Unified English")),"Hidden device option lacks prerequisite guidance");
+    ((List<Button>)Field(w,"settingsSearchResults")).First().RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Check(((Settings)Field(w,"draft")).SpeechModel=="Vosk","Search changed the speech model");
+    Call(w,"OpenSection","General");
+    search.Text="startup";Check(((List<Button>)Field(w,"settingsSearchResults")).Any(b=>Convert.ToString(b.ToolTip)=="Open General"),"Startup alias missed start with Windows");
+    search.Text="no_such_option_4829";Check(Controls<TextBlock>((StackPanel)Field(w,"content")).Any(t=>t.Text.Contains("No matching settings")),"Empty search lacks recovery guidance");
+    Call(w,"ClearSettingsSearch",true);Check(Convert.ToString(((Button)Field(w,"selectedSettingsPage")).Content)=="General","Clear did not restore page");
+   }finally{w.Close();}
+  });
   Test("Preview and capture do not present dictation onboarding",delegate {
    var w=Island();try{Call(w,"MaybeShowDictationWelcome");Check(Field(w,"dictationWelcome")==null,"Preview opened first-run setup");Check(!((AppState)Field(w,"state")).DictationWelcomeCompleted,"Preview consumed first-run choice");}finally{Call(w,"Cleanup");}
   });

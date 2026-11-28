@@ -87,7 +87,7 @@ You need Windows, .NET Framework 4.8 and Windows SDK metadata (`Windows.winmd`).
 ```powershell
 .\build.ps1            # Compile to bin/DeskPill.exe
 .\build.ps1 -Test      # Build and run all test suites
-.\package.ps1          # Create dist/DeskPill-2.2.2-portable.zip
+.\package.ps1          # Create dist/DeskPill-2.2.3-portable.zip
 ```
 
 The solution is also available as `DeskPill.sln`. Full UI, media and OCR probes require an interactive Windows desktop; CI runs the deterministic suites. See [CONTRIBUTING.md](../CONTRIBUTING.md).
@@ -126,3 +126,5 @@ Bugs and focused pull requests are welcome. Include the Windows version, display
 If DeskPill is useful to you, consider giving the repository a ⭐.
 
 Saved preferences and agent connections live in `%LOCALAPPDATA%\DeskPill\state.json`. Saves retain a last-good `state.json.bak` for recovery; this backup excludes clipboard history. Preview/capture modes read settings without writing to the normal profile. Conversation messages and drafts remain in memory.
+
+Settings includes a search bar for option names and descriptions. Try “startup”, “GPU”, “transparency” or “hover”. Select a result to open its page and scroll to the option. Ctrl+F focuses search, Enter opens the first result and Esc clears the query. Searching preserves unsaved edits; Save and Cancel keep their normal behavior. User-entered values and passwords are excluded from search.
