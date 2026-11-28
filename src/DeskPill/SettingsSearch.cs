@@ -70,6 +70,8 @@ namespace DeskPill
         static string SearchAliases(string text)
         {
             string value=text.ToLowerInvariant();
+            if(value.Contains("overall notch size"))value+=" scale height dimensions";
+            if(value.Contains("corner"))value+=" shape radius rounding";
             if(value.Contains("processing device"))value+=" gpu cpu vulkan automatic";
             if(value.Contains("opacity"))value+=" transparency translucent";
             if(value.Contains("dictation"))value+=" speech voice microphone";

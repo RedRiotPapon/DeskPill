@@ -1,6 +1,6 @@
 <p align="center"><img src="assets/DeskPill.svg" width="72" alt="DeskPill icon"></p>
 <h1 align="center">DeskPill</h1>
-<p align="center"><strong><a href="https://github.com/RedRiotPapon/DeskPill/releases/latest/download/DeskPill-2.2.3-portable.zip">⬇ Download for Windows</a></strong> · <a href="https://github.com/RedRiotPapon/DeskPill/releases/latest">Release notes</a></p>
+<p align="center"><strong><a href="https://github.com/RedRiotPapon/DeskPill/releases/latest/download/DeskPill-2.3.0-portable.zip">⬇ Download for Windows</a></strong> · <a href="https://github.com/RedRiotPapon/DeskPill/releases/latest">Release notes</a></p>
 <p align="center"><a href="https://github.com/RedRiotPapon/DeskPill/releases"><img src="https://img.shields.io/github/downloads/RedRiotPapon/DeskPill/total?style=flat-square&amp;label=Total%20downloads&amp;color=48c774" alt="Total GitHub release downloads"></a></p>
 <p align="center">Music, shortcuts and everyday tools in a compact Windows notch.</p>
 <p align="center">Windows 10/11 · Portable · Native WPF · MIT license</p>
@@ -9,7 +9,7 @@
 
 ## Make it yours
 
-Live theme previews, **Classic and Glass**, seven colored skins, and your own custom palette. Adjust opacity, colors, finish, size and position. Tune hover delays and animation pace, then hide or reorder pages to suit your day.
+Live theme previews, **Classic and Glass**, seven colored skins, and your own custom palette. Adjust opacity, colors and finish. Preview notch size, width, corner shape and placement before saving. Tune hover delays and animation pace, then hide or reorder pages to suit your day.
 
 ![DeskPill themes with demo data](docs/images/skins.png)
 
@@ -28,7 +28,7 @@ Live theme previews, **Classic and Glass**, seven colored skins, and your own cu
 
 ## Get started
 
-1. **[Download the ZIP](https://github.com/RedRiotPapon/DeskPill/releases/latest/download/DeskPill-2.2.3-portable.zip)**, extract it, and run `DeskPill.exe`. Keep `DeskPill.Speech.exe` beside it.
+1. **[Download the ZIP](https://github.com/RedRiotPapon/DeskPill/releases/latest/download/DeskPill-2.3.0-portable.zip)**, extract it, and run `DeskPill.exe`. Keep `DeskPill.Speech.exe` beside it.
 2. On first launch, choose **Set up dictation** or **Continue without dictation**. Setup is always available later.
 3. Hover over the notch to open it. Use the arrows, dots or wheel to navigate.
 4. Right-click the tray icon for **Settings** and **Start with Windows…**.

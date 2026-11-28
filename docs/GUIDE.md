@@ -87,7 +87,7 @@ You need Windows, .NET Framework 4.8 and Windows SDK metadata (`Windows.winmd`).
 ```powershell
 .\build.ps1            # Compile to bin/DeskPill.exe
 .\build.ps1 -Test      # Build and run all test suites
-.\package.ps1          # Create dist/DeskPill-2.2.3-portable.zip
+.\package.ps1          # Create dist/DeskPill-2.3.0-portable.zip
 ```
 
 The solution is also available as `DeskPill.sln`. Full UI, media and OCR probes require an interactive Windows desktop; CI runs the deterministic suites. See [CONTRIBUTING.md](../CONTRIBUTING.md).
@@ -128,3 +128,5 @@ If DeskPill is useful to you, consider giving the repository a ⭐.
 Saved preferences and agent connections live in `%LOCALAPPDATA%\DeskPill\state.json`. Saves retain a last-good `state.json.bak` for recovery; this backup excludes clipboard history. Preview/capture modes read settings without writing to the normal profile. Conversation messages and drafts remain in memory.
 
 Settings includes a search bar for option names and descriptions. Try “startup”, “GPU”, “transparency” or “hover”. Select a result to open its page and scroll to the option. Ctrl+F focuses search, Enter opens the first result and Esc clears the query. Searching preserves unsaved edits; Save and Cancel keep their normal behavior. User-entered values and passwords are excluded from search.
+
+Settings → Size & shape previews 80–160% overall size, 150–240 logical-pixel idle width, Classic/Floating placement and Original/Rounded/Soft square corners. Text and expanded controls scale together; only the idle bar widens. Tiny overlap hiding stays compact. Shape changes use the same outline for the shell, rim and content clip. Reset restores 100%, 150 px, Classic and Original; Cancel restores saved geometry. Values are bounded for readable layouts and Windows display scaling still applies.

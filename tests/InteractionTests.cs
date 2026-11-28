@@ -47,6 +47,24 @@ class InteractionTests {
   Test("Regular users never initialize agent services from housekeeping",delegate {
    var w=Island();try{Call(w,"TrackAgentContext");Call(w,"ObserveAgentTransitions");Check(Field(w,"agentHub")==null&&Field(w,"agentScreenTarget")==null&&Field(w,"agentSpeech")==null,"Agent housekeeping activated without a connection");}finally{Call(w,"Cleanup");}
   });
+  Test("Size and shape preview stays staged, resets, and adapts the notch",delegate {
+   var state=new AppState();int previews=0;var w=new SettingsWindow(state,delegate{},delegate{},null,null,delegate(Settings value,bool demo){previews++;});
+   try{Call(w,"OpenSection","Size & shape");var size=Controls<Slider>(w).Single(x=>System.Windows.Automation.AutomationProperties.GetName(x)=="Overall notch size");
+    size.Value=135;Call(w,"OpenSection","General");
+    var combo=Controls<ComboBox>(w).Single(c=>c.Items.Contains("135%"));Check(Convert.ToString(combo.SelectedItem)=="135%","Size slider did not sync General picker");combo.SelectedItem="130%";Check(size.Value==130,"General picker did not sync size slider");
+    Call(w,"OpenSection","Size & shape");size.Value=135;Controls<Slider>(w).Single(x=>Convert.ToString(x.Tag)=="CompactWidth").Value=220;
+    Controls<RadioButton>(w).Single(x=>Convert.ToString(x.Tag)=="Rounded").IsChecked=true;
+    Check(((Settings)Field(w,"draft")).Scale==1.35&&((Settings)Field(w,"draft")).CompactWidth==220&&previews>=3,"Geometry controls did not preview");
+    Check(state.Settings.Scale==1&&state.Settings.CompactWidth==150&&state.Settings.NotchShape=="Original","Preview changed saved geometry");
+    Controls<Button>(w).Single(x=>Convert.ToString(x.Content)=="Reset size & shape").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+    Check(size.Value==100&&((Settings)Field(w,"draft")).CompactWidth==150&&((Settings)Field(w,"draft")).NotchShape=="Original","Reset left customized geometry");
+   }finally{w.Close();}
+   var island=Island();try{var settings=new Settings {CompactWidth=240,NotchShape="Soft square",Scale=1.6};Call(island,"PreviewPreferences",settings,false);
+    var shape=(System.Windows.Shapes.Path)Field(island,"shell");Check(shape.Data.Bounds.Width>=240,"Wide preview did not reach shell");
+    Check(((Grid)Field(island,"compact")).Width==222,"Wide preview did not center compact content");
+    Call(island,"PreviewPreferences",new Settings(),false);Check(((Grid)Field(island,"compact")).Width==132,"Cancel did not restore compact layout");
+   }finally{Call(island,"Cleanup");}
+  });
   Test("Settings search finds options and opens their page without losing drafts",delegate {
    var state=new AppState();var w=new SettingsWindow(state,delegate{},delegate{});
    try{var search=(TextBox)Field(w,"settingsSearch");Call(w,"OpenSection","General");
@@ -310,7 +328,7 @@ class InteractionTests {
   });
   Test("Saving Floating style realigns every content layer with the shell",delegate {
    var state=new AppState();state.Settings.FastAnimations=true;var w=new IslandWindow(state,new StateStore(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"style-fixture")),false,true);Call(w,"SetOpen",false);Call(w,"ShowSettings");var settings=(SettingsWindow)Field(w,"settingsWindow");
-   Controls<Button>(settings).Single(b=>Convert.ToString(b.Content)=="General").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+   Controls<Button>(settings).Single(b=>Convert.ToString(b.Content)=="Size & shape").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
    Controls<ComboBox>(settings).Single(c=>c.Items.Contains("Floating") && c.Items.Contains("Classic")).SelectedItem="Floating";
    Controls<Button>(settings).Single(b=>Convert.ToString(b.Content)=="Save changes").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
    Check(Canvas.GetTop((FrameworkElement)Field(w,"compact"))==10,"Compact content did not follow Floating shell");

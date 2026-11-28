@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -91,6 +91,7 @@ namespace DeskPill
             body.Children.Add(scroll);
             AddPage(nav, "General", General());
             AddPage(nav, "Appearance", Appearance());
+            AddPage(nav, "Size & shape", SizeAndShape());
             AddPage(nav, "Motion", MotionOptions());
             AddPage(nav, "Gaming", GamingOptions());
             AddPage(nav, "Pages", Pages());
@@ -410,32 +411,17 @@ namespace DeskPill
             }).ToList();
             screens.Insert(0, "");
             Choice(p, "Display (blank = primary)", "Monitor", screens.ToArray());
-            Label(p, "Scale");
-            var scale = new ComboBox
-            {
-                ItemsSource = new[]
-                {
-                    "100%",
-                    "115%",
-                    "130%",
-                    "150%"
-                },
-                SelectedIndex = Array.IndexOf(new[] { 1.0, 1.15, 1.3, 1.5 }, draft.Scale),
-                MinHeight = 32
+            Label(p, "Overall size");
+            geometryScaleChoice = new ComboBox {MinHeight=32};
+            SetGeometryScaleChoice(draft.Scale);
+            geometryScaleChoice.SelectionChanged+=delegate {
+                if(geometrySyncing||geometryScaleChoice.SelectedItem==null)return;
+                double value=double.Parse(Convert.ToString(geometryScaleChoice.SelectedItem).TrimEnd('%'),CultureInfo.InvariantCulture)/100;
+                draft.Scale=value;
+                if(geometryScaleSlider!=null)geometryScaleSlider.Value=value*100;
+                this.previewPreferences(draft,false);
             };
-            if (scale.SelectedIndex < 0)
-                scale.SelectedIndex = 0;
-            p.Children.Add(scale);
-            readers.Add(delegate
-            {
-                draft.Scale = new[]
-                {
-                    1.0,
-                    1.15,
-                    1.3,
-                    1.5
-                }[scale.SelectedIndex];
-            });
+            p.Children.Add(geometryScaleChoice);
             Number(p, "Top offset (pixels)", "OffsetY", 0, 1000);
             Check(p, "Show clock", "ShowClock");
             Check(p, "Show idle mascot in the notch", "ShowMascot");
@@ -449,7 +435,7 @@ namespace DeskPill
             }));
             Check(p, "Show sleek HUD pills for volume, brightness & status", "ShowHudPopups");
             Choice(p, "Open island on", "OpenMode", new[] { "Hover", "Click" });
-            Choice(p, "Island style", "Style", new[] { "Classic", "Floating" });
+            Note(p,"For corner shapes, idle width and a precise size slider, open Size & shape.");
             Check(p, "Hide while a fullscreen app is active", "HideFullscreen");
             Check(p, "Play reminder sounds", "Sound");
             Check(p, "Use fast animations", "FastAnimations");

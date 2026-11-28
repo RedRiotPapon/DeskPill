@@ -57,6 +57,7 @@ namespace DeskPill
         TimeSpan lastRenderTime = TimeSpan.MinValue;
         bool subscribed;
         bool floating;
+        string shape="Original";
         int generation;
         Action onSettled;
         readonly Action onFrame;
@@ -142,6 +143,13 @@ namespace DeskPill
             this.rim = rim;
             this.content = content;
             this.onFrame = onFrame;
+        }
+
+        public void SetShape(string value)
+        {
+            value=value=="Rounded"||value=="Soft square"?value:"Original";
+            if(shape==value)return;
+            shape=value;lastDrawnWidth=double.NaN;Draw();
         }
 
         public void SetStyle(bool value)
@@ -482,7 +490,7 @@ namespace DeskPill
             lastDrawnWidth = curW;
             lastDrawnHeight = curH;
             lastDrawnFloating = floating;
-            Geometry geometry = OutlineSize(curW, curH, floating);
+            Geometry geometry = CustomizedOutline(curW, curH, floating,shape);
             shell.Data = geometry;
             content.Clip = geometry;
             if (rim != null)
@@ -505,6 +513,11 @@ namespace DeskPill
 
         internal static Geometry OutlineSize(double width, double height, bool floating)
         {
+            return CustomizedOutline(width,height,floating,"Original");
+        }
+
+        internal static Geometry CustomizedOutline(double width,double height,bool floating,string shape)
+        {
             double w = Math.Max(36.0, Math.Min(CanvasWidth - 20.0, width));
             double h = Math.Max(4.0, Math.Min(CanvasHeight - 12.0, height));
             double y0 = floating ? FloatingTopOffset : 0.0;
@@ -515,21 +528,27 @@ namespace DeskPill
             double t = Clamp01((h - CompactHeight) / 110.0);
 
             double bottomR = Math.Min(3.0 + 11.0 * microT + 16.0 * t, Math.Min(h * 0.5, w * 0.5));
+            if(h>10&&shape!="Original")bottomR=Math.Min(shape=="Soft square"?8+12*t:16+18*t,Math.Min(h*.5,w*.5));
             var geometry = new StreamGeometry();
             using (var c = geometry.Open())
             {
                 if (floating)
                 {
                     double topR = Math.Min(3.0 + 11.0 * microT + 14.0 * t, Math.Min(h * 0.5, w * 0.5));
+                    if(h>10&&shape!="Original")topR=bottomR;
                     c.BeginFigure(new Point(left + topR, y0), true, true);
                     c.LineTo(new Point(right - topR, y0), true, false);
-                    c.QuadraticBezierTo(new Point(right, y0), new Point(right, y0 + topR), true, false);
+                    if(shape=="Rounded")c.ArcTo(new Point(right, y0 + topR),new Size(topR,topR),0,false,SweepDirection.Clockwise,true,false);
+                    else c.QuadraticBezierTo(new Point(right, y0), new Point(right, y0 + topR), true, false);
                     c.LineTo(new Point(right, y1 - bottomR), true, false);
-                    c.QuadraticBezierTo(new Point(right, y1), new Point(right - bottomR, y1), true, false);
+                    if(shape=="Rounded")c.ArcTo(new Point(right - bottomR, y1),new Size(bottomR,bottomR),0,false,SweepDirection.Clockwise,true,false);
+                    else c.QuadraticBezierTo(new Point(right, y1), new Point(right - bottomR, y1), true, false);
                     c.LineTo(new Point(left + bottomR, y1), true, false);
-                    c.QuadraticBezierTo(new Point(left, y1), new Point(left, y1 - bottomR), true, false);
+                    if(shape=="Rounded")c.ArcTo(new Point(left, y1 - bottomR),new Size(bottomR,bottomR),0,false,SweepDirection.Clockwise,true,false);
+                    else c.QuadraticBezierTo(new Point(left, y1), new Point(left, y1 - bottomR), true, false);
                     c.LineTo(new Point(left, y0 + topR), true, false);
-                    c.QuadraticBezierTo(new Point(left, y0), new Point(left + topR, y0), true, false);
+                    if(shape=="Rounded")c.ArcTo(new Point(left + topR, y0),new Size(topR,topR),0,false,SweepDirection.Clockwise,true,false);
+                    else c.QuadraticBezierTo(new Point(left, y0), new Point(left + topR, y0), true, false);
                 }
                 else
                 {
@@ -542,9 +561,11 @@ namespace DeskPill
                     c.LineTo(new Point(right + ear, 0), true, false);
                     c.BezierTo(new Point(right + ear * 0.35, 0), new Point(right, earDrop * 0.25), new Point(right, earDrop), true, false);
                     c.LineTo(new Point(right, y1 - bottomR), true, false);
-                    c.QuadraticBezierTo(new Point(right, y1), new Point(right - bottomR, y1), true, false);
+                    if(shape=="Rounded")c.ArcTo(new Point(right - bottomR, y1),new Size(bottomR,bottomR),0,false,SweepDirection.Clockwise,true,false);
+                    else c.QuadraticBezierTo(new Point(right, y1), new Point(right - bottomR, y1), true, false);
                     c.LineTo(new Point(left + bottomR, y1), true, false);
-                    c.QuadraticBezierTo(new Point(left, y1), new Point(left, y1 - bottomR), true, false);
+                    if(shape=="Rounded")c.ArcTo(new Point(left, y1 - bottomR),new Size(bottomR,bottomR),0,false,SweepDirection.Clockwise,true,false);
+                    else c.QuadraticBezierTo(new Point(left, y1), new Point(left, y1 - bottomR), true, false);
                     c.LineTo(new Point(left, earDrop), true, false);
                     c.BezierTo(new Point(left, earDrop * 0.25), new Point(left - ear * 0.35, 0), new Point(left - ear, 0), true, false);
                 }

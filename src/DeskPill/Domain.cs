@@ -34,6 +34,8 @@ namespace DeskPill
         public static string ColorOrDefault(string value, string fallback) { return IsHexColor(value) ? value.ToUpperInvariant() : fallback; }
         public string Monitor = "", Style = "Classic", OpenMode = "Hover", StatusRing = "Water";
         public string SpeechModel="Vosk", SpeechBackend="Auto";
+        public int CompactWidth=150;
+        public string NotchShape="Original";
         public bool AgentVoiceToggle = false;
         public bool AgentCompletionPeeks = true;
         public bool MirrorNotifications = true; public bool DictationEnabled = false;
@@ -146,7 +148,9 @@ namespace DeskPill
             s.CustomMuted = Settings.ColorOrDefault(s.CustomMuted, "#A7B3C5");
             s.CustomOutline = Clamp(s.CustomOutline, 0, 60);
             if (s.CustomFinish != "Matte") s.CustomFinish = "Satin";
-            s.Scale = Bound(s.Scale, .65, 2, 1);
+            s.Scale = Bound(s.Scale, .8, 1.6, 1);
+            s.CompactWidth=s.CompactWidth==0?150:Clamp(s.CompactWidth,150,240);
+            if(s.NotchShape!="Rounded"&&s.NotchShape!="Soft square")s.NotchShape="Original";
             s.OffsetY = Bound(s.OffsetY, 0, 1000, 0);
             s.FocusMinutes = Clamp(s.FocusMinutes, 1, 240);
             s.ShortBreakMinutes = Clamp(s.ShortBreakMinutes, 1, 120);

@@ -22,6 +22,9 @@ namespace DeskPill
     {
         Settings preferencesPreview;
         int motionDemoRevision;
+        string motionShapePreview="Original",motionStylePreview="Classic";
+        int motionWidthPreview=150;
+        double motionScalePreview=1;
         Settings MotionPreferences {get{return preferencesPreview??state.Settings;}}
         const double ExpandedWidthClassic = 396.0;
         const double ExpandedWidthFloating = 380.0;
@@ -224,6 +227,7 @@ namespace DeskPill
 
             motion = new IslandMotion(shell, rim, contentHost, OnMotionFrame);
             motion.TimeScale=state.Settings.MotionPace/100.0;
+            motionScalePreview=state.Settings.Scale;motionShapePreview=state.Settings.NotchShape;motionWidthPreview=state.Settings.CompactWidth;motionStylePreview=state.Settings.Style;
             focus = new FocusClock(state.Settings);
             focus.RestoreFrom(state, DateTime.UtcNow);
             waterReminder = DateTime.Now.AddMinutes(state.Settings.ReminderMinutes);
@@ -434,6 +438,7 @@ namespace DeskPill
             Loaded += async delegate
             {
                 Place();
+                motion.SetShape(MotionPreferences.NotchShape);
                 motion.SetStyle(IsFloating);
                 SnapPoseImmediate();
                 if (RuntimeProbeMode) return;
@@ -521,6 +526,7 @@ namespace DeskPill
             ContextMenu = BuildMenu();
 
             // Build initial active page synchronously so logical tree queries work immediately (UiTests).
+            motion.SetShape(MotionPreferences.NotchShape);
             motion.SetStyle(IsFloating);
             SnapPoseImmediate();
             RebuildCurrentPage(true);
@@ -724,7 +730,7 @@ namespace DeskPill
         {
             get
             {
-                return gameModeActive || state.Settings.Style == "Floating" || preview;
+                return gameModeActive || MotionPreferences.Style == "Floating" || preview;
             }
         }
 
@@ -736,7 +742,7 @@ namespace DeskPill
         double DesiredCompactWidth()
         {
 
-            return 150.0;
+            return gameModeActive?150.0:MotionPreferences.CompactWidth;
         }
 
         NotchPose RestingClosedPose()
@@ -827,6 +833,7 @@ namespace DeskPill
             double w, h;
             bool showDock, showHud;
             TargetDimensions(pose, out w, out h, out showDock, out showHud);
+            motion.SetShape(MotionPreferences.NotchShape);
             motion.SetStyle(IsFloating);
             LayoutLayersTopOffset();
             motion.SnapPose(w, h, showDock, showHud);
@@ -856,13 +863,14 @@ namespace DeskPill
             double screenWidthDip = screen.Bounds.Width * 96.0 / dpiX;
             double screenTopDip = screen.Bounds.Top * 96.0 / dpiY;
             double workBottomDip = screen.WorkingArea.Bottom * 96.0 / dpiY;
-            currentScale = Math.Min(state.Settings.Scale, screenWidthDip / IslandMotion.CanvasWidth);
+            currentScale = Math.Min(MotionPreferences.Scale, screenWidthDip / IslandMotion.CanvasWidth);
             design.LayoutTransform = new ScaleTransform(currentScale, currentScale);
             Width = IslandMotion.CanvasWidth * currentScale;
             Height = IslandMotion.CanvasHeight * currentScale;
             Left = Math.Round(screenLeftDip + (screenWidthDip - Width) * 0.5);
-            double desiredTop = screenTopDip + state.Settings.OffsetY + (preview ? 210.0 : 0.0);
+            double desiredTop = screenTopDip + MotionPreferences.OffsetY + (preview ? 210.0 : 0.0);
             Top = Math.Round(Math.Min(desiredTop, workBottomDip - Height));
+            motion.SetShape(MotionPreferences.NotchShape);
             motion.SetStyle(IsFloating);
             LayoutLayersTopOffset();
             if (!preview && !capture && IsVisible)
@@ -3610,6 +3618,8 @@ namespace DeskPill
             int revision=++motionDemoRevision;
             preferencesPreview=settings;motion.TimeScale=settings.MotionPace/100.0;
             closeTimer.Interval=TimeSpan.FromMilliseconds(settings.HoverCloseMs);
+            bool geometryChanged=Math.Abs(motionScalePreview-settings.Scale)>.001||motionShapePreview!=settings.NotchShape||motionWidthPreview!=settings.CompactWidth||motionStylePreview!=settings.Style;
+            if(geometryChanged){motionScalePreview=settings.Scale;motionShapePreview=settings.NotchShape;motionWidthPreview=settings.CompactWidth;motionStylePreview=settings.Style;Place();UpdateValues();SnapPoseImmediate();}
             if(demonstrate){SetOpen(false);await Task.Delay(180);if(settingsWindow!=null && revision==motionDemoRevision)SetOpen(true);}
         }
 

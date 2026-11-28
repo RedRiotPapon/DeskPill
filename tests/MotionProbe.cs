@@ -256,6 +256,11 @@ class MotionProbe
                 Check(hb.Width >= 294.0 && hb.Height >= 37.5 && hb.Height <= 38.5 && Math.Abs(hb.Left + hb.Right - 540.0) < 0.001, (floating ? "Floating" : "Classic") + " HudPill outline centered & symmetric");
             }
 
+            var customized=type.GetMethod("CustomizedOutline",BindingFlags.Static|BindingFlags.NonPublic);
+            foreach(string shape in new[]{"Original","Rounded","Soft square"})foreach(bool floating in new[]{false,true})foreach(double height in new[]{6.0,30,38,90,172,202,238}){
+                var g=(Geometry)customized.Invoke(null,new object[]{height==6?52.0:height==30?240.0:484.0,height,floating,shape});
+                var b=g.Bounds;Check(g.IsFrozen&&Math.Abs(b.Left+b.Right-540)<.001&&Math.Abs(b.Height-height)<.001&&b.Left>=0&&b.Right<=540,shape+" geometry remains symmetric and bounded at "+height+"px, floating="+floating);
+            }
             VerifySpringPhysics();
             VerifyRefreshCadences();
 

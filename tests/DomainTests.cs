@@ -20,6 +20,10 @@ class DomainTests
             Check(!new AppState().DictationWelcomeCompleted, "New profiles offer optional dictation setup");
             var upgraded = new AppState {Version=3}; upgraded.Normalize(DateTime.Now);
             Check(upgraded.DictationWelcomeCompleted, "Existing profiles are not interrupted by onboarding after upgrade");
+            var geometry=new AppState();geometry.Settings.CompactWidth=0;geometry.Settings.NotchShape=null;geometry.Normalize(DateTime.Now);
+            Check(geometry.Settings.CompactWidth==150&&geometry.Settings.NotchShape=="Original","Older profiles retain original notch dimensions and shape");
+            geometry.Settings.CompactWidth=999;geometry.Settings.Scale=.1;geometry.Settings.NotchShape="unknown";geometry.Normalize(DateTime.Now);
+            Check(geometry.Settings.CompactWidth==240&&geometry.Settings.Scale==.8&&geometry.Settings.NotchShape=="Original","Notch customization bounds preserve readable geometry");
             var s = new Settings();
             var f = new FocusClock(s);
             f.Start(t);
@@ -96,7 +100,9 @@ class DomainTests
                 Check(store.Load().FocusPhase == "Focus", "legacy state saves with timer defaults");
                 store.Save(a);
                 a.DictationWelcomeCompleted=true;store.Save(a);
+                a.Settings.CompactWidth=210;a.Settings.NotchShape="Rounded";store.Save(a);
                 var b = store.Load();
+                Check(b.Settings.CompactWidth==210&&b.Settings.NotchShape=="Rounded","Notch width and shape survive restart");
                 Check(b.DictationWelcomeCompleted, "Dictation welcome choice survives restart");
                 Check(b.Agents.Count==1 && b.SelectedAgent==a.SelectedAgent && !b.Settings.VisiblePages().Contains("Agents"),"Connections and hidden Agents page survive JSON roundtrip");
                 Check(b.Tasks.Count == 1 && b.Tasks[0].Title == "Keep me" && b.Shelf.Count == 1, "task and shelf JSON roundtrip");
