@@ -17,6 +17,9 @@ class DomainTests
         try
         {
             var t = new DateTime(2026, 11, 26, 10, 0, 0, DateTimeKind.Utc);
+            Check(!new AppState().DictationWelcomeCompleted, "New profiles offer optional dictation setup");
+            var upgraded = new AppState {Version=3}; upgraded.Normalize(DateTime.Now);
+            Check(upgraded.DictationWelcomeCompleted, "Existing profiles are not interrupted by onboarding after upgrade");
             var s = new Settings();
             var f = new FocusClock(s);
             f.Start(t);
@@ -92,7 +95,9 @@ class DomainTests
                 store.Save(legacy);
                 Check(store.Load().FocusPhase == "Focus", "legacy state saves with timer defaults");
                 store.Save(a);
+                a.DictationWelcomeCompleted=true;store.Save(a);
                 var b = store.Load();
+                Check(b.DictationWelcomeCompleted, "Dictation welcome choice survives restart");
                 Check(b.Agents.Count==1 && b.SelectedAgent==a.SelectedAgent && !b.Settings.VisiblePages().Contains("Agents"),"Connections and hidden Agents page survive JSON roundtrip");
                 Check(b.Tasks.Count == 1 && b.Tasks[0].Title == "Keep me" && b.Shelf.Count == 1, "task and shelf JSON roundtrip");
                 Check(Settings.ThemeNames.Length == 10 && Settings.ThemeNames[0]=="Classic" && Settings.ThemeNames[1]=="Glass", "Classic stays default, followed by Glass, seven skins and Custom");

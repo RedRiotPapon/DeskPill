@@ -47,6 +47,24 @@ class InteractionTests {
   Test("Regular users never initialize agent services from housekeeping",delegate {
    var w=Island();try{Call(w,"TrackAgentContext");Call(w,"ObserveAgentTransitions");Check(Field(w,"agentHub")==null&&Field(w,"agentScreenTarget")==null&&Field(w,"agentSpeech")==null,"Agent housekeeping activated without a connection");}finally{Call(w,"Cleanup");}
   });
+  Test("Preview and capture do not present dictation onboarding",delegate {
+   var w=Island();try{Call(w,"MaybeShowDictationWelcome");Check(Field(w,"dictationWelcome")==null,"Preview opened first-run setup");Check(!((AppState)Field(w,"state")).DictationWelcomeCompleted,"Preview consumed first-run choice");}finally{Call(w,"Cleanup");}
+  });
+  Test("Dictation welcome offers an explicit setup or skip without enabling speech",delegate {
+   var type=typeof(SettingsWindow).Assembly.GetType("DeskPill.DictationWelcomeWindow");Check(type!=null,"Welcome screen is missing");
+   bool? selected=null;var w=(Window)Activator.CreateInstance(type,new object[]{new Func<bool,bool>(setup=>{selected=setup;return true;})});
+   try{Check(Controls<TextBlock>(w).Any(t=>t.Text.Contains("Ctrl")&&t.Text.Contains("Space")),"Shortcut is not explained");
+    var buttons=Controls<Button>(w).ToArray();Check(buttons.Any(b=>Convert.ToString(b.Content)=="Continue without dictation"),"Skip action missing");
+    buttons.Single(b=>Convert.ToString(b.Content)=="Set up dictation").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Check(selected==true,"Setup action did not route to model selection");
+   }finally{w.Close();}
+   selected=null;w=(Window)Activator.CreateInstance(type,new object[]{new Func<bool,bool>(setup=>{selected=setup;return true;})});
+   Controls<Button>(w).Single(b=>Convert.ToString(b.Content)=="Continue without dictation").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Check(selected==false,"Skip did not persist the choice");
+  });
+  Test("Welcome remains recoverable if saving the choice fails",delegate {
+   var type=typeof(SettingsWindow).Assembly.GetType("DeskPill.DictationWelcomeWindow");Check(type!=null,"Welcome screen missing");bool allow=false;int attempts=0;
+   var w=(Window)Activator.CreateInstance(type,new object[]{new Func<bool,bool>(setup=>{attempts++;return allow;})});
+   try{Controls<Button>(w).Single(b=>Convert.ToString(b.Content)=="Set up dictation").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Check(attempts==1&&Controls<TextBlock>(w).Any(t=>t.Text.Contains("try again")),"Failed save was silently accepted");allow=true;}finally{w.Close();}
+  });
   Test("Agents page clearly labels experimental status and screen sharing",delegate {
    var w=Island();try{Call(w,"SelectPage","Agents");Check(Controls<TextBlock>(w).Any(t=>t.Text.Contains("Experimental")),"Empty Agents page lacks experimental label");var state=(AppState)Field(w,"state");var p=new AgentProfile();state.Agents.Add(p);Call(w,"RebuildCurrentPage",true);Check(((TextBlock)Field(w,"agentPageStatus")).Text.Contains("Experimental"),"Connected Agents lacks experimental label");Call(w,"ShowAgentConversation",p.Id);Check(((TextBox)Field(w,"agentResult")).Text.Contains("camera"),"Screen questions lack explicit attachment guidance");}finally{Call(w,"Cleanup");}
   });

@@ -87,7 +87,8 @@ namespace DeskPill
         public bool FocusRunning = false;
         public double FocusRemainingSeconds = 0;
         public DateTime FocusDeadlineUtc = new DateTime(0, DateTimeKind.Utc);
-        public int Version = 3;
+        public int Version = 4;
+        public bool DictationWelcomeCompleted;
         public Settings Settings = new Settings();
         public List<AgentProfile> Agents = new List<AgentProfile>();
         public string SelectedAgent = "";
@@ -132,6 +133,7 @@ namespace DeskPill
                 s.ShowHudPopups = true;
             }
             if (Version < 3) s.MirrorNotifications = true;
+            if (Version < 4) DictationWelcomeCompleted = true;
             s.SpeechModel=s.SpeechModel=="Parakeet"?"Parakeet":"Vosk";
             if(s.SpeechBackend!="CPU"&&s.SpeechBackend!="GPU")s.SpeechBackend="Auto";
             s.Theme = Settings.NormalizeTheme(s.Theme);
@@ -211,7 +213,7 @@ namespace DeskPill
             WaterMl = Clamp(WaterMl, 0, 100000);
             Refills = Clamp(Refills, 0, 100000);
             CompletedFocus = Clamp(CompletedFocus, 0, 1000000);
-            Version = 3;
+            Version = 4;
         }
 
         static string Limit(string s, int n)

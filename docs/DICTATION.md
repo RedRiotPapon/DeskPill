@@ -2,6 +2,8 @@
 
 DeskPill owns the capture, shortcut handling, listening animation, review and paste behavior. Recognition uses your choice of Vosk Small English or Parakeet Unified English through DeskPill's own x64 worker. It requires no separate dictation application or speech account.
 
+On a new profile’s first launch, DeskPill offers **Set up dictation** or **Continue without dictation**. Setup opens Settings → Dictation for model selection and an explicit download. Neither choice starts a download, enables the shortcut or opens the microphone. Skipping, Esc or closing the welcome screen remembers the choice; Settings → Dictation remains available later. Existing profiles are not interrupted when updating. A failed save keeps the welcome screen open with a retry message.
+
 ## Resource and privacy behavior
 
 - Off by default. The low-level Ctrl+Space listener is installed only after the user enables dictation and saves; disabling unhooks it and cancels an active session.

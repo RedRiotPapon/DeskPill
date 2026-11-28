@@ -1,6 +1,6 @@
 <p align="center"><img src="assets/DeskPill.svg" width="72" alt="DeskPill icon"></p>
 <h1 align="center">DeskPill</h1>
-<p align="center"><strong><a href="https://github.com/RedRiotPapon/DeskPill/releases/latest/download/DeskPill-2.2.1-portable.zip">⬇ Download for Windows</a></strong> · <a href="https://github.com/RedRiotPapon/DeskPill/releases/latest">Release notes</a></p>
+<p align="center"><strong><a href="https://github.com/RedRiotPapon/DeskPill/releases/latest/download/DeskPill-2.2.2-portable.zip">⬇ Download for Windows</a></strong> · <a href="https://github.com/RedRiotPapon/DeskPill/releases/latest">Release notes</a></p>
 <p align="center">Music, shortcuts and everyday tools in a compact Windows notch.</p>
 <p align="center">Windows 10/11 · Portable · Native WPF · MIT license</p>
 
@@ -27,9 +27,10 @@ Live theme previews, **Classic and Glass**, seven colored skins, and your own cu
 
 ## Get started
 
-1. **[Download the ZIP](https://github.com/RedRiotPapon/DeskPill/releases/latest/download/DeskPill-2.2.1-portable.zip)**, extract it, and run `DeskPill.exe`. Keep `DeskPill.Speech.exe` beside it.
-2. Hover over the notch to open it. Use the arrows, dots or wheel to navigate.
-3. Right-click the tray icon for **Settings** and **Start with Windows…**.
+1. **[Download the ZIP](https://github.com/RedRiotPapon/DeskPill/releases/latest/download/DeskPill-2.2.2-portable.zip)**, extract it, and run `DeskPill.exe`. Keep `DeskPill.Speech.exe` beside it.
+2. On first launch, choose **Set up dictation** or **Continue without dictation**. Setup is always available later.
+3. Hover over the notch to open it. Use the arrows, dots or wheel to navigate.
+4. Right-click the tray icon for **Settings** and **Start with Windows…**.
 
 Requires .NET Framework 4.8. The portable app is unsigned. Dictation shows model requirements before an explicit download and must be enabled; it reserves Ctrl+Space while enabled. Startup and game mode are opt-in.
 

@@ -447,6 +447,7 @@ namespace DeskPill
                 if(!preview)await PollGameMode();
                 if (!preview) {dictation=new DictationController(this,state.Settings,Notify,delegate {if(pose==NotchPose.NotificationPeek)DismissNotification();SetOpen(false);});dictation.Configure();}
                 SetupTray();
+                await Dispatcher.InvokeAsync(new Action(MaybeShowDictationWelcome),DispatcherPriority.ContextIdle);
                 lastVolume = SystemService.GetVolume();
                 lastMuted = SystemService.GetMuted();
                 if (!preview)
@@ -3253,6 +3254,7 @@ namespace DeskPill
 
         async Task Tick()
         {
+            MaybeShowDictationWelcome();
             if (stopping)
                 return;
             TrackAgentContext();ObserveAgentTransitions();
@@ -3749,6 +3751,8 @@ namespace DeskPill
 
         void Cleanup()
         {
+            stopping=true;
+            if(dictationWelcome!=null)dictationWelcome.Close();
             CleanupAgents();
             CloseVolumeMenu();
             if(volumeWriter!=null){volumeWriter.Dispose();volumeWriter=null;}
